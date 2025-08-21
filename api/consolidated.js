@@ -2,11 +2,15 @@
 const { createClient } = require('@libsql/client');
 const AIService = require('./_lib/ai-service');
 
-// Debug environment variables in Vercel
-console.log('🔍 Environment check:');
-console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
-console.log('TURSO_AUTH_TOKEN exists:', !!process.env.TURSO_AUTH_TOKEN);
-console.log('TURSO_DATABASE_URL exists:', !!process.env.TURSO_DATABASE_URL);
+// Debug environment variables in Vercel (only log once)
+if (!global.envLogged) {
+  console.log('🔍 Environment check:');
+  console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+  console.log('TURSO_AUTH_TOKEN exists:', !!process.env.TURSO_AUTH_TOKEN);
+  console.log('TURSO_DATABASE_URL exists:', !!process.env.TURSO_DATABASE_URL);
+  console.log('NODE_ENV:', process.env.NODE_ENV);
+  global.envLogged = true;
+}
 
 function createDbClient() {
   return createClient({
@@ -668,11 +672,41 @@ async function handleRequest(req, res) {
     
     // Route: GET /diagram?id=... - Get single diagram
     if (method === 'GET' && url.includes('/diagram') && !url.includes('/diagrams') && !url.includes('/diagram-')) {
+      console.log('📊 GET /diagram endpoint hit');
       const urlParams = new URLSearchParams(url.split('?')[1] || '');
       const id = urlParams.get('id');
-      const client = createDbClient();
+      console.log('📊 Diagram ID requested:', id);
+      
+      if (!id) {
+        console.log('❌ No diagram ID provided');
+        return res.status(400).json({ error: 'Diagram ID is required' });
+      }
+      
+      let client;
+      try {
+        console.log('🔗 Creating database client...');
+        console.log('🔗 Database URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
+        console.log('🔗 Turso URL:', process.env.TURSO_DATABASE_URL ? 'Set' : 'Not set');
+        console.log('🔗 Auth Token:', process.env.TURSO_AUTH_TOKEN ? 'Set' : 'Not set');
+        
+        const dbUrl = process.env.DATABASE_URL || process.env.TURSO_DATABASE_URL;
+        if (!dbUrl) {
+          console.error('❌ No database URL configured');
+          return res.status(500).json({ error: 'Database not configured' });
+        }
+        
+        client = createDbClient();
+        console.log('✅ Database client created');
+      } catch (dbError) {
+        console.error('❌ Failed to create database client:', dbError);
+        return res.status(500).json({ 
+          error: 'Database connection failed',
+          details: dbError.message 
+        });
+      }
 
       try {
+        console.log('🔍 Querying database for diagram:', id);
         // Get diagram with owner info
         const result = await client.execute({
           sql: `SELECT 
@@ -684,12 +718,16 @@ async function handleRequest(req, res) {
                 WHERE d.id = ?`,
           args: [id]
         });
+        
+        console.log('✅ Query executed, rows found:', result.rows.length);
 
         if (result.rows.length === 0) {
+          console.log('❌ Diagram not found in database');
           return res.status(404).json({ success: false, message: 'Diagram not found' });
         }
 
         const row = result.rows[0];
+        console.log('✅ Diagram data retrieved from database');
 
         // Check if lock is expired
         const now = new Date();
@@ -723,10 +761,23 @@ async function handleRequest(req, res) {
 
         return res.status(200).json(diagram);
       } catch (error) {
-        console.error('Get diagram error:', error);
-        return res.status(500).json({ success: false, message: 'Internal server error' });
+        console.error('❌ Get diagram error:', error);
+        console.error('❌ Error stack:', error.stack);
+        return res.status(500).json({ 
+          success: false, 
+          message: 'Internal server error',
+          error: error.message,
+          details: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+        });
       } finally {
-        client.close();
+        if (client) {
+          try {
+            client.close();
+            console.log('✅ Database connection closed');
+          } catch (closeError) {
+            console.error('⚠️ Error closing database connection:', closeError);
+          }
+        }
       }
     }
     
