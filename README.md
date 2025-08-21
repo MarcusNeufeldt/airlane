@@ -1,31 +1,30 @@
-# 🎨 Scema - AI-Powered Database Diagram Tool
+# ✈️ Airlane - Professional BPMN 2.0 Process Modeling Platform
 
-[![GitHub](https://img.shields.io/github/license/MarcusNeufeldt/er_diagram_scema_app)](LICENSE)
+[![GitHub](https://img.shields.io/github/license/MarcusNeufeldt/airlane)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D%2018-brightgreen)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/react-%5E18.0-blue)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/typescript-%5E4.0-blue)](https://www.typescriptlang.org/)
+[![BPMN](https://img.shields.io/badge/BPMN-2.0-green)](https://www.bpmn.org/)
 
-A modern, AI-powered database diagram tool with intelligent auto-layout, real-time collaboration, and comprehensive visual design capabilities. Create, modify, and analyze database schemas through natural language or intuitive visual editing.
+A professional BPMN 2.0 process modeling platform with Signavio compatibility, AI-powered process generation, and universal format support. Create, import, and analyze business processes with enterprise-grade features and intelligent automation.
 
 ## ✨ Features
 
-### 🎯 **Core Functionality**
-- **Visual Database Design** - Interactive drag-and-drop table creation with resizable nodes
-- **Smart Relationships** - Easy foreign key connections with visual feedback and cardinality
-- **Auto-Layout** - Intelligent left-to-right hierarchical arrangement based on dependencies
-- **Quick Field Addition** - One-click "+" button for rapid table building
-- **Advanced Field Editing** - Inline editing with comprehensive data type dropdowns
-- **Export/Import** - JSON, SQL DDL, and custom diagram formats
+### 🎯 **BPMN 2.0 Compliance**
+- **Complete Element Library** - Events, Tasks, Gateways, Lanes, Pools, Data Objects
+- **Professional Interface** - Signavio-style visual design with hover effects and proper handles
+- **Universal Import/Export** - Compatible with Signavio, Camunda, Bizagi, and other BPMN tools
+- **Lane Organization** - Color-coded organizational lanes with toggle-able visual indicators
+- **Smart Connections** - Dynamic handle mapping for all node types with intelligent routing
+- **Process Validation** - Real-time BPMN compliance checking with comprehensive error reporting
 
-### 🤖 **AI Integration** 
+### 🤖 **AI-Powered Process Generation** 
 - **OpenRouter Integration** - Powered by Google Gemini 2.5 Flash with reasoning models
-- **Persistent Chat History** - AI remembers full conversation context per diagram
-- **Natural Language Schema Generation** - Create complete databases from descriptions
-- **Intelligent Modifications** - Add/modify tables and relationships through conversation
-- **Schema Analysis** - AI-powered recommendations and performance insights
-- **Incremental Updates** - AI can modify existing schemas without full regeneration
-- **Visual Context Awareness** - AI understands current diagram state for smart suggestions
-- **Context Preservation** - Follow-up commands like "apply those fixes" work seamlessly
+- **Natural Language Processing** - Generate complete business processes from descriptions
+- **Intelligent Process Analysis** - AI-powered recommendations and optimization insights
+- **Context-Aware Generation** - AI understands current process state for smart suggestions
+- **Incremental Updates** - AI can modify existing processes without full regeneration
+- **Process Optimization** - Identify bottlenecks and suggest improvements
 
 ### 🎨 **Visual & UX Features**
 - **Professional Layout** - Industry-standard ER diagram styling with proper z-index layering

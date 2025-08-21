@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Table, Users, Download, Upload } from 'lucide-react';
+import { X, Activity, Users, Download, Upload, GitBranch } from 'lucide-react';
 
 export const WelcomeModal: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,7 +25,7 @@ export const WelcomeModal: React.FC = () => {
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-gray-800">
-              Welcome to Data Modeler
+              Welcome to Airlane
             </h2>
             <button
               onClick={handleClose}
@@ -37,47 +37,47 @@ export const WelcomeModal: React.FC = () => {
 
           <div className="space-y-6">
             <p className="text-gray-600">
-              A real-time collaborative data modeling tool for designing and visualizing database schemas.
+              A professional BPMN 2.0 process modeling platform with Signavio compatibility, AI-powered process generation, and universal format support.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center space-x-3 mb-2">
-                  <Table className="text-blue-500" size={24} />
-                  <h3 className="font-semibold">Create Tables</h3>
+                  <Activity className="text-blue-500" size={24} />
+                  <h3 className="font-semibold">BPMN Elements</h3>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Use the "Add Table" button to create new database tables on the canvas.
+                  Create complete business processes with events, tasks, gateways, lanes, and pools using our comprehensive BPMN 2.0 toolbar.
                 </p>
               </div>
 
               <div className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center space-x-3 mb-2">
                   <Users className="text-green-500" size={24} />
-                  <h3 className="font-semibold">Real-time Collaboration</h3>
+                  <h3 className="font-semibold">Lane Organization</h3>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Multiple users can edit simultaneously. Open multiple tabs to see it in action!
+                  Visualize organizational roles and responsibilities with color-coded lanes and toggle-able visual indicators.
                 </p>
               </div>
 
               <div className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center space-x-3 mb-2">
                   <Upload className="text-purple-500" size={24} />
-                  <h3 className="font-semibold">Import SQL</h3>
+                  <h3 className="font-semibold">Universal Import</h3>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Upload existing CREATE TABLE statements to visualize your current database schema.
+                  Import BPMN files from Signavio, Camunda, Bizagi, and other tools with intelligent parsing and layout preservation.
                 </p>
               </div>
 
               <div className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center space-x-3 mb-2">
-                  <Download className="text-orange-500" size={24} />
-                  <h3 className="font-semibold">Export DDL</h3>
+                  <GitBranch className="text-orange-500" size={24} />
+                  <h3 className="font-semibold">AI Process Generation</h3>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Export your diagram as SQL DDL or JSON to implement in your database.
+                  Generate complete business processes from natural language descriptions using our integrated AI assistant.
                 </p>
               </div>
             </div>
@@ -85,10 +85,11 @@ export const WelcomeModal: React.FC = () => {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h4 className="font-semibold text-blue-800 mb-2">Quick Start Tips:</h4>
               <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Click on any table to edit its properties in the right panel</li>
-                <li>• Try importing the sample-schema.sql file from the project root</li>
-                <li>• Use mouse wheel to zoom, drag to pan around the canvas</li>
-                <li>• The minimap in the bottom-right helps navigate large diagrams</li>
+                <li>• Start with a Start Event, add Tasks and connect them with sequence flows</li>
+                <li>• Try importing the test-with-lanes.bpmn file to see lane visualization</li>
+                <li>• Use View → Show/Hide Lane Colors to toggle organizational indicators</li>
+                <li>• Double-click any element to edit its label inline</li>
+                <li>• Access the AI assistant in the sidebar for intelligent process generation</li>
               </ul>
             </div>
 
