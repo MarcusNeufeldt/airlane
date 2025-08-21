@@ -81,6 +81,7 @@ interface UIState {
   simulationTokens: SimulationToken[];
   simulationSpeed: number;
   simulationPaused: boolean;
+  simulationRandomness: boolean; // Whether to use random path selection for gateways
 
 }
 
@@ -127,6 +128,7 @@ interface DiagramState extends UIState {
   stepSimulation: () => void;
   resetSimulation: () => void;
   setSimulationSpeed: (speed: number) => void;
+  setSimulationRandomness: (randomness: boolean) => void;
   toggleNodeSelection: (nodeId: string) => void;
   initializeYjs: (doc: Y.Doc) => void;
   syncFromYjs: () => void;
@@ -223,6 +225,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
     simulationTokens: [],
     simulationSpeed: 1000,
     simulationPaused: false,
+    simulationRandomness: true, // Enable random path selection by default
 
     // History Management
     undo: () => {
@@ -715,7 +718,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
     },
 
     stepSimulation: () => {
-      const { simulationTokens, nodes, edges, simulationSpeed } = get();
+      const { simulationTokens, nodes, edges, simulationSpeed, simulationRandomness } = get();
 
       console.log('🎬 Step simulation:', {
         totalTokens: simulationTokens.length,
@@ -753,9 +756,45 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
 
           switch (gatewayType) {
             case 'exclusive':
-              // Exclusive gateway - take first unconditional path or default
-              const defaultEdge = outgoingEdges.find(edge => (edge.data as any)?.isDefault);
-              nextNodeId = defaultEdge ? defaultEdge.target : outgoingEdges[0]?.target;
+              // Exclusive gateway - evaluate conditions or choose randomly
+              let selectedEdge = null;
+              
+              // First, try to find edges with conditions that evaluate to true
+              const edgesWithConditions = outgoingEdges.filter(edge => 
+                edge.data?.condition && edge.data.condition.trim() !== ''
+              );
+              
+              if (edgesWithConditions.length > 0) {
+                // For now, randomly select from edges with conditions
+                // TODO: Implement proper condition evaluation
+                if (simulationRandomness) {
+                  const randomIndex = Math.floor(Math.random() * edgesWithConditions.length);
+                  selectedEdge = edgesWithConditions[randomIndex];
+                  console.log('🎲 XOR Gateway: Randomly selected edge with condition:', selectedEdge.data?.condition);
+                } else {
+                  selectedEdge = edgesWithConditions[0];
+                  console.log('🎯 XOR Gateway: Using first edge with condition:', selectedEdge.data?.condition);
+                }
+              } else {
+                // No conditions defined, look for default edge
+                const defaultEdge = outgoingEdges.find(edge => (edge.data as any)?.isDefault);
+                if (defaultEdge) {
+                  selectedEdge = defaultEdge;
+                  console.log('🎯 XOR Gateway: Using default edge');
+                } else {
+                  // No default edge
+                  if (simulationRandomness) {
+                    const randomIndex = Math.floor(Math.random() * outgoingEdges.length);
+                    selectedEdge = outgoingEdges[randomIndex];
+                    console.log('🎲 XOR Gateway: Randomly selected edge', randomIndex + 1, 'of', outgoingEdges.length);
+                  } else {
+                    selectedEdge = outgoingEdges[0];
+                    console.log('🎯 XOR Gateway: Using first available edge (deterministic mode)');
+                  }
+                }
+              }
+              
+              nextNodeId = selectedEdge?.target;
               break;
 
             case 'parallel':
@@ -811,8 +850,79 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
               return;
 
             case 'inclusive':
-              // Inclusive gateway - take all paths (simplified implementation)
-              nextNodeId = outgoingEdges[0]?.target;
+              // Inclusive gateway - can take multiple paths based on conditions
+              // For simulation purposes, decide which paths to take (at least one)
+              const availablePaths = outgoingEdges.length;
+              let pathsToTake: number;
+              
+              if (simulationRandomness) {
+                pathsToTake = Math.max(1, Math.floor(Math.random() * availablePaths) + 1);
+                console.log('🎲 Inclusive Gateway: Randomly taking', pathsToTake, 'of', availablePaths, 'paths');
+              } else {
+                // In deterministic mode, take all paths (this is more predictable)
+                pathsToTake = availablePaths;
+                console.log('🎯 Inclusive Gateway: Taking all', pathsToTake, 'paths (deterministic mode)');
+              }
+              
+              if (pathsToTake === 1) {
+                // Single path - select one
+                if (simulationRandomness) {
+                  const randomIndex = Math.floor(Math.random() * outgoingEdges.length);
+                  nextNodeId = outgoingEdges[randomIndex]?.target;
+                } else {
+                  nextNodeId = outgoingEdges[0]?.target;
+                }
+              } else {
+                // Multiple paths - create tokens for each selected path (similar to parallel)
+                let selectedEdges: typeof outgoingEdges;
+                if (simulationRandomness) {
+                  const shuffledEdges = [...outgoingEdges].sort(() => Math.random() - 0.5);
+                  selectedEdges = shuffledEdges.slice(0, pathsToTake);
+                } else {
+                  selectedEdges = outgoingEdges.slice(0, pathsToTake);
+                }
+                
+                const newTokens: SimulationToken[] = [];
+                selectedEdges.forEach((edge, index) => {
+                  const inclusiveToken: SimulationToken = {
+                    id: `token-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`,
+                    currentNodeId: edge.target,
+                    path: [...token.path, edge.target],
+                    data: { ...token.data },
+                    status: 'active'
+                  };
+                  newTokens.push(inclusiveToken);
+                });
+                
+                // Replace the current token with the new inclusive tokens
+                const updatedTokens = [...simulationTokens.filter(t => t.id !== token.id), ...newTokens];
+                
+                // Update active nodes
+                const newActiveNodes = [...get().simulationActiveNodes];
+                const currentIndex = newActiveNodes.indexOf(currentNode.id);
+                if (currentIndex > -1) {
+                  newActiveNodes.splice(currentIndex, 1);
+                }
+                newTokens.forEach(newToken => {
+                  newActiveNodes.push(newToken.currentNodeId);
+                });
+                
+                set({
+                  simulationTokens: updatedTokens,
+                  simulationActiveNodes: newActiveNodes
+                });
+                
+                console.log('✅ Inclusive gateway processed, new active nodes:', newActiveNodes);
+                
+                // Continue simulation
+                setTimeout(() => {
+                  if (!get().simulationPaused && get().isSimulating) {
+                    get().stepSimulation();
+                  }
+                }, simulationSpeed);
+                
+                return;
+              }
               break;
 
             default:
@@ -882,6 +992,10 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
 
     setSimulationSpeed: (speed: number) => {
       set({ simulationSpeed: speed });
+    },
+
+    setSimulationRandomness: (randomness: boolean) => {
+      set({ simulationRandomness: randomness });
     },
 
     closeAllDropdowns: () => {

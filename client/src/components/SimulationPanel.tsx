@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, Square, SkipForward, RotateCcw, Zap, Clock, Activity, TrendingUp, X } from 'lucide-react';
+import { Play, Pause, Square, SkipForward, RotateCcw, Zap, Clock, Activity, TrendingUp, X, Shuffle, Target } from 'lucide-react';
 import { useDiagramStore } from '../stores/diagramStore';
 import { Dialog, DialogContent } from './ui/dialog';
 
@@ -14,6 +14,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ isOpen, onClos
     simulationPaused,
     simulationTokens,
     simulationSpeed,
+    simulationRandomness,
     simulationActiveNodes,
     simulationActiveEdges,
     startSimulation,
@@ -21,7 +22,8 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ isOpen, onClos
     stopSimulation,
     stepSimulation,
     resetSimulation,
-    setSimulationSpeed
+    setSimulationSpeed,
+    setSimulationRandomness
   } = useDiagramStore();
 
   const activeTokens = simulationTokens.filter(token => token.status === 'active');
@@ -156,6 +158,58 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ isOpen, onClos
                 onChange={(e) => setSimulationSpeed(Number(e.target.value))}
                 className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
               />
+            </div>
+          </div>
+
+          {/* Gateway Behavior Control */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              {simulationRandomness ? <Shuffle size={18} /> : <Target size={18} />}
+              Gateway Behavior
+            </h3>
+            
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${simulationRandomness ? 'bg-purple-100' : 'bg-blue-100'}`}>
+                    {simulationRandomness ? 
+                      <Shuffle className={`w-5 h-5 ${simulationRandomness ? 'text-purple-600' : 'text-blue-600'}`} /> :
+                      <Target className={`w-5 h-5 ${simulationRandomness ? 'text-purple-600' : 'text-blue-600'}`} />
+                    }
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      {simulationRandomness ? 'Random Path Selection' : 'Deterministic Path Selection'}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {simulationRandomness 
+                        ? 'XOR gateways randomly choose different paths each time' 
+                        : 'XOR gateways always choose the same path (predictable)'
+                      }
+                    </p>
+                  </div>
+                </div>
+                
+                <button
+                  onClick={() => setSimulationRandomness(!simulationRandomness)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    simulationRandomness ? 'bg-purple-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      simulationRandomness ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-600">
+                  <strong>💡 Tip:</strong> Toggle between random and deterministic modes to test different scenarios. 
+                  Random mode helps explore all possible paths, while deterministic mode ensures consistent results.
+                </p>
+              </div>
             </div>
           </div>
 
