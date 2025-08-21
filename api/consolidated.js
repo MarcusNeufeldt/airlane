@@ -4,7 +4,7 @@ const AIService = require('./_lib/ai-service');
 
 function createDbClient() {
   return createClient({
-    url: process.env.TURSO_DATABASE_URL,
+    url: process.env.DATABASE_URL || process.env.TURSO_DATABASE_URL,
     authToken: process.env.TURSO_AUTH_TOKEN,
   });
 }
