@@ -94,28 +94,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ onCreateDiagram }) => {
       const name = prompt('Enter diagram name:');
       if (!name || !name.trim()) return;
 
-      // Create new diagram locally instead of API call
-      const newDiagram: Diagram = {
-        id: `diagram-${Date.now()}`,
-        name: name.trim(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        lockedByUserId: null,
-        lockExpiresAt: null,
-        owner: {
-          id: currentUser.id,
-          name: currentUser.name || 'Process Designer',
-          email: currentUser.email
-        }
-      };
-
-      // Save to localStorage
-      const updatedDiagrams = [newDiagram, ...diagrams];
-      localStorage.setItem('process_diagrams', JSON.stringify(updatedDiagrams));
-      setDiagrams(updatedDiagrams);
+      // Create new diagram in cloud database
+      const diagramId = `diagram-${Date.now()}`;
       
+      const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+      const response = await fetch(`${API_BASE_URL}/diagram?id=${diagramId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          nodes: [],
+          edges: [],
+          userId: currentUser.id
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `Failed to create diagram: ${response.status}`);
+      }
+
       // Navigate to the new diagram
-      window.location.href = `/diagram/${newDiagram.id}`;
+      window.location.href = `/diagram/${diagramId}`;
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to create diagram');
     }
