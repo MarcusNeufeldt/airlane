@@ -85,30 +85,40 @@ export const DiagramView: React.FC = () => {
 
       try {
         setLoading(true);
-        // Load diagram from localStorage instead of API
-        const storedDiagrams = localStorage.getItem('process_diagrams');
-        if (storedDiagrams) {
-          const diagrams = JSON.parse(storedDiagrams);
-          const diagram = diagrams.find((d: any) => d.id === diagramId);
-          
-          if (diagram) {
-            setDiagramInfo(diagram);
-            console.log('📊 Loading diagram from localStorage...');
-            importDiagram({
-              nodes: diagram.nodes || [],
-              edges: diagram.edges || [],
-            });
-            console.log('✅ Diagram loaded successfully');
-          } else {
+        // Load diagram from cloud database
+        console.log('📊 Loading diagram from cloud database...');
+        
+        const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+        const response = await fetch(`${API_BASE_URL}/diagram?id=${diagramId}`);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
             alert('Diagram not found');
-            navigate('/');
-            return;
+          } else {
+            alert(`Failed to load diagram: ${response.status}`);
           }
-        } else {
-          alert('No diagrams found');
           navigate('/');
           return;
         }
+
+        const diagram = await response.json();
+        console.log('📊 Loaded diagram data:', diagram);
+        
+        setDiagramInfo({
+          id: diagram.id,
+          name: diagram.name,
+          createdAt: diagram.createdAt,
+          updatedAt: diagram.updatedAt,
+          owner: diagram.owner
+        });
+
+        // Import nodes and edges into the diagram
+        importDiagram({
+          nodes: diagram.nodes || [],
+          edges: diagram.edges || [],
+        });
+        
+        console.log('✅ Diagram loaded successfully from cloud database');
       } catch (error) {
         console.error('Failed to load diagram:', error);
         alert('Failed to load diagram');

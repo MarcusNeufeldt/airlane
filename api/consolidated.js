@@ -725,19 +725,56 @@ module.exports = async (req, res) => {
           args: [id]
         });
 
+        const now = new Date();
+
         if (diagramResult.rows.length === 0) {
-          return res.status(404).json({ success: false, message: 'Diagram not found' });
+          // Diagram doesn't exist, create it
+          console.log(`📝 Creating new diagram: ${id} for user: ${userId}`);
+          
+          // First ensure the user exists
+          await client.execute({
+            sql: 'INSERT OR REPLACE INTO User (id, email, name) VALUES (?, ?, ?)',
+            args: [userId, `${userId}@example.com`, userId]
+          });
+
+          // Create the new diagram
+          await client.execute({
+            sql: `INSERT INTO Diagram (id, name, nodes, edges, ownerId, createdAt, updatedAt, lockedByUserId, lockExpiresAt) 
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [
+              id,
+              name || 'Untitled Diagram',
+              JSON.stringify(nodes || []),
+              JSON.stringify(edges || []),
+              userId,
+              now.toISOString(),
+              now.toISOString(),
+              userId,
+              new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 minute lock
+            ]
+          });
+
+          console.log(`✅ Diagram created successfully: ${id}`);
+          return res.json({ success: true, created: true });
         }
 
         const diagram = diagramResult.rows[0];
-        const now = new Date();
         const isLockExpired = !diagram.lockExpiresAt || new Date(diagram.lockExpiresAt) < now;
 
-        // Verify user has valid lock
-        if (diagram.lockedByUserId !== userId || isLockExpired) {
+        // Verify user has valid lock (or extend lock if expired but user is same)
+        if (diagram.lockedByUserId !== userId) {
           return res.status(403).json({ 
             success: false, 
-            message: 'Your editing session has expired. Please reload to get the latest version.' 
+            message: 'Diagram is locked by another user' 
+          });
+        }
+
+        // Extend lock if needed
+        if (isLockExpired) {
+          console.log(`🔓 Extending expired lock for diagram: ${id}, user: ${userId}`);
+          await client.execute({
+            sql: 'UPDATE Diagram SET lockExpiresAt = ? WHERE id = ?',
+            args: [new Date(Date.now() + 10 * 60 * 1000).toISOString(), id]
           });
         }
 

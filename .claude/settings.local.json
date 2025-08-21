@@ -54,7 +54,8 @@
       "Bash(./turso.exe --version)",
       "Bash(npx tsc:*)",
       "Bash(set PORT=3002)",
-      "Bash(git branch:*)"
+      "Bash(git branch:*)",
+      "Bash(sed:*)"
     ],
     "deny": [],
     "ask": [],
