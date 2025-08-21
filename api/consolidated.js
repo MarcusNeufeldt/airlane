@@ -235,7 +235,25 @@ function computeFinalSchemaState(currentSchema, newSchema) {
 }
 
 // Main function that handles all API routes
-module.exports = async (req, res) => {
+// Vercel serverless function handler
+export default async function handler(req, res) {
+  // Enable CORS for browser requests
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  return handleRequest(req, res);
+}
+
+// Also export for CommonJS compatibility (local development)
+module.exports = handler;
+
+async function handleRequest(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -1213,4 +1231,4 @@ module.exports = async (req, res) => {
       details: error.message 
     });
   }
-};
+}
