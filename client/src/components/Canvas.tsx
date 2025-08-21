@@ -10,10 +10,12 @@ import ReactFlow, {
   ConnectionLineType,
   MarkerType,
   useReactFlow,
+  Node,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
 import { useDiagramStore } from '../stores/diagramStore';
+import { DiagramNodeData } from '../types';
 import { ProcessNode } from './ProcessNode';
 import { EventNode } from './EventNode';
 import { GatewayNode } from './GatewayNode';
@@ -45,7 +47,11 @@ const edgeTypes: EdgeTypes = {
   'message-flow': MessageFlowEdge,
 };
 
-export const Canvas: React.FC = () => {
+interface CanvasProps {
+  showMiniMap?: boolean;
+}
+
+export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
   const {
     nodes,
     edges,
@@ -76,6 +82,8 @@ export const Canvas: React.FC = () => {
     deleteNode,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     updateNode,
+    alignSelectedNodes,
+    distributeSelectedNodes,
   } = useDiagramStore();
 
   const { setCenter, getNode, zoomIn, zoomOut, fitView } = useReactFlow();
@@ -252,16 +260,177 @@ export const Canvas: React.FC = () => {
         setCenter(0, 0, { zoom: 1, duration: 500 });
         return;
       }
+
+      // Ctrl+S to save
+      if (isCtrlOrCmd && event.key === 's' && !isReadOnly) {
+        event.preventDefault();
+        // Trigger save through the diagram store
+        const saveButton = document.querySelector('[title="Save"], button:has(svg.lucide-save)') as HTMLButtonElement;
+        if (saveButton && !saveButton.disabled) {
+          saveButton.click();
+        }
+        return;
+      }
+
+      // Ctrl+? to show keyboard shortcuts
+      if (isCtrlOrCmd && event.key === '?') {
+        event.preventDefault();
+        // Trigger keyboard shortcuts dialog
+        const shortcutsButton = document.querySelector('[title*="keyboard shortcuts"], [title*="Shortcuts"]') as HTMLButtonElement;
+        if (shortcutsButton) {
+          shortcutsButton.click();
+        }
+        return;
+      }
+
+      // Quick element creation shortcuts (when not in read-only mode)
+      if (!isReadOnly) {
+        // Press 't' to add Task
+        if (event.key === 't' && !isCtrlOrCmd) {
+          event.preventDefault();
+          addNode('process', { x: 400, y: 200 });
+          return;
+        }
+
+        // Press 'e' to add Start Event
+        if (event.key === 'e' && !isCtrlOrCmd) {
+          event.preventDefault();
+          addNode('event', { x: 400, y: 200 }, { eventType: 'start' });
+          return;
+        }
+
+        // Press 'g' to add Gateway
+        if (event.key === 'g' && !isCtrlOrCmd) {
+          event.preventDefault();
+          addNode('gateway', { x: 400, y: 200 });
+          return;
+        }
+
+        // Press 'l' to add Lane
+        if (event.key === 'l' && !isCtrlOrCmd) {
+          event.preventDefault();
+          addNode('lane', { x: 400, y: 200 });
+          return;
+        }
+
+        // Press 'p' to add Pool
+        if (event.key === 'p' && !isCtrlOrCmd) {
+          event.preventDefault();
+          addNode('pool', { x: 400, y: 200 });
+          return;
+        }
+
+        // Press 'd' to add Data Object
+        if (event.key === 'd' && !isCtrlOrCmd) {
+          event.preventDefault();
+          addNode('data-object', { x: 400, y: 200 });
+          return;
+        }
+      }
+
+      // Alignment shortcuts (Ctrl+Shift+key)
+      if (isCtrlOrCmd && event.shiftKey && selectedNodeIds.length >= 2 && !isReadOnly) {
+        if (event.key === 'L' || event.key === 'l') {
+          event.preventDefault();
+          alignSelectedNodes('left');
+          return;
+        }
+        if (event.key === 'R' || event.key === 'r') {
+          event.preventDefault();
+          alignSelectedNodes('right');
+          return;
+        }
+        if (event.key === 'T' || event.key === 't') {
+          event.preventDefault();
+          alignSelectedNodes('top');
+          return;
+        }
+        if (event.key === 'B' || event.key === 'b') {
+          event.preventDefault();
+          alignSelectedNodes('bottom');
+          return;
+        }
+        if (event.key === 'C' || event.key === 'c') {
+          event.preventDefault();
+          alignSelectedNodes('center-horizontal');
+          return;
+        }
+        if (event.key === 'M' || event.key === 'm') {
+          event.preventDefault();
+          alignSelectedNodes('center-vertical');
+          return;
+        }
+        // Distribution shortcuts
+        if (event.key === 'H' || event.key === 'h') {
+          event.preventDefault();
+          if (selectedNodeIds.length >= 3) {
+            distributeSelectedNodes('horizontal');
+          }
+          return;
+        }
+        if (event.key === 'V' || event.key === 'v') {
+          event.preventDefault();
+          if (selectedNodeIds.length >= 3) {
+            distributeSelectedNodes('vertical');
+          }
+          return;
+        }
+      }
+
+      // Arrow key navigation between selected elements
+      if (selectedNodeIds.length > 1 && !isCtrlOrCmd) {
+        if (event.key.startsWith('Arrow')) {
+          event.preventDefault();
+          // Find current focused node (first selected node)
+          const currentNode = nodes.find(n => n.id === selectedNodeIds[0]);
+          if (!currentNode) return;
+
+          let nextNode: Node<DiagramNodeData> | null = null;
+          switch (event.key) {
+            case 'ArrowLeft':
+              nextNode = nodes
+                .filter(n => selectedNodeIds.includes(n.id) && n.id !== currentNode.id)
+                .sort((a, b) => b.position.x - a.position.x)[0]; // Leftmost node
+              break;
+            case 'ArrowRight':
+              nextNode = nodes
+                .filter(n => selectedNodeIds.includes(n.id) && n.id !== currentNode.id)
+                .sort((a, b) => a.position.x - b.position.x)[0]; // Rightmost node
+              break;
+            case 'ArrowUp':
+              nextNode = nodes
+                .filter(n => selectedNodeIds.includes(n.id) && n.id !== currentNode.id)
+                .sort((a, b) => b.position.y - a.position.y)[0]; // Topmost node
+              break;
+            case 'ArrowDown':
+              nextNode = nodes
+                .filter(n => selectedNodeIds.includes(n.id) && n.id !== currentNode.id)
+                .sort((a, b) => a.position.y - b.position.y)[0]; // Bottommost node
+              break;
+          }
+
+          if (nextNode) {
+            // Move focus to the next node by updating selection
+            setSelectedNodes([nextNode.id, ...selectedNodeIds.filter(id => id !== nextNode!.id)]);
+          }
+          return;
+        }
+      }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [
-    setSearchOpen, 
-    selectedNodeIds, 
-    deleteSelectedNodes, 
-    selectAllNodes, 
-    duplicateSelectedNodes, 
+    setSearchOpen,
+    addNode,
+    alignSelectedNodes,
+    distributeSelectedNodes,
+    nodes,
+    setSelectedNodes,
+    selectedNodeIds,
+    deleteSelectedNodes,
+    selectAllNodes,
+    duplicateSelectedNodes,
     deselectAllNodes,
     undo,
     redo,
@@ -426,19 +595,21 @@ export const Canvas: React.FC = () => {
           color={snapToGrid ? '#d1d5db' : '#f3f4f6'}
         />
         <Controls />
-        <MiniMap
-          nodeStrokeColor={(n) => {
-            if (n.type === 'table') return '#1a192b';
-            return '#eee';
-          }}
-          nodeColor={(n) => {
-            if (n.type === 'table') return '#fff';
-            return '#fff';
-          }}
-          style={{
-            backgroundColor: '#f7fafc',
-          }}
-        />
+        {showMiniMap && (
+          <MiniMap
+            nodeStrokeColor={(n) => {
+              if (n.type === 'table') return '#1a192b';
+              return '#eee';
+            }}
+            nodeColor={(n) => {
+              if (n.type === 'table') return '#fff';
+              return '#fff';
+            }}
+            style={{
+              backgroundColor: '#f7fafc',
+            }}
+          />
+        )}
       </ReactFlow>
       
       {/* Search Component */}

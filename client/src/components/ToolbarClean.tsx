@@ -1,9 +1,10 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { 
-  Download, Upload, Save, Undo, Redo, Bot, Layout, 
+import {
+  Download, Upload, Save, Undo, Redo, Bot, Layout,
   Grid3x3, StickyNote, Square, Circle, Diamond, ChevronDown,
   FileText, Shapes, Settings, Eye, Maximize2, Focus, Search,
-  GitBranch, Activity, Users, Building2, Database, StopCircle, PlayCircle
+  GitBranch, Activity, Users, Building2, Database, StopCircle, PlayCircle,
+  Keyboard
 } from 'lucide-react';
 // Removed useReactFlow import to avoid context issues
 import { useDiagramStore } from '../stores/diagramStore';
@@ -11,12 +12,15 @@ import { userService } from '../services/userService';
 import { LockStatusIndicator } from './LockStatusIndicator';
 import { exportCurrentViewportAsPNG, exportFullDiagramAsPNG } from '../lib/exportUtils';
 import { ImportExportDialog } from './ImportExportDialog';
+import { KeyboardShortcutsDialog } from './KeyboardShortcutsDialog';
 
 interface ToolbarProps {
   onOpenAIChat: () => void;
+  showMiniMap?: boolean;
+  onToggleMiniMap?: () => void;
 }
 
-export const ToolbarClean: React.FC<ToolbarProps> = ({ onOpenAIChat }) => {
+export const ToolbarClean: React.FC<ToolbarProps> = ({ onOpenAIChat, showMiniMap, onToggleMiniMap }) => {
   const { 
     addNode, 
     nodes, 
@@ -50,8 +54,9 @@ export const ToolbarClean: React.FC<ToolbarProps> = ({ onOpenAIChat }) => {
   const shapeMenuRef = useRef<HTMLDivElement>(null);
   const viewMenuRef = useRef<HTMLDivElement>(null);
   
-  // BPMN Import/Export Dialog state
+  // Dialog states
   const [showImportExportDialog, setShowImportExportDialog] = useState(false);
+  const [showKeyboardShortcutsDialog, setShowKeyboardShortcutsDialog] = useState(false);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -415,6 +420,16 @@ export const ToolbarClean: React.FC<ToolbarProps> = ({ onOpenAIChat }) => {
           <span className="text-sm">Fit View</span>
         </button>
 
+        {/* Keyboard Shortcuts Button */}
+        <button
+          onClick={() => setShowKeyboardShortcutsDialog(true)}
+          className="flex items-center space-x-1 px-3 py-1.5 text-gray-700 hover:bg-gray-100 rounded transition-colors"
+          title="View keyboard shortcuts (Ctrl+?)"
+        >
+          <Keyboard size={16} />
+          <span className="text-sm">Shortcuts</span>
+        </button>
+
         {/* File Menu */}
         <div className="relative" ref={fileMenuRef}>
           <button
@@ -564,6 +579,16 @@ export const ToolbarClean: React.FC<ToolbarProps> = ({ onOpenAIChat }) => {
                 <Users size={14} />
                 <span>{showLaneColors ? 'Hide' : 'Show'} Lane Colors</span>
               </button>
+              <button
+                onClick={() => {
+                  onToggleMiniMap?.();
+                  setShowViewMenu(false);
+                }}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center space-x-2"
+              >
+                <Maximize2 size={14} />
+                <span>{showMiniMap ? 'Hide' : 'Show'} Mini Map</span>
+              </button>
             </div>
           )}
         </div>
@@ -606,10 +631,14 @@ export const ToolbarClean: React.FC<ToolbarProps> = ({ onOpenAIChat }) => {
         </button>
       </div>
 
-      {/* BPMN Import/Export Dialog */}
-      <ImportExportDialog 
+      {/* Dialogs */}
+      <ImportExportDialog
         isOpen={showImportExportDialog}
         onClose={() => setShowImportExportDialog(false)}
+      />
+      <KeyboardShortcutsDialog
+        isOpen={showKeyboardShortcutsDialog}
+        onClose={() => setShowKeyboardShortcutsDialog(false)}
       />
     </div>
   );

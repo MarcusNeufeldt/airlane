@@ -25,6 +25,7 @@ export const DiagramView: React.FC = () => {
   const [currentUser, setCurrentUser] = useState(userService.getCurrentUser());
   const [diagramInfo, setDiagramInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showMiniMap, setShowMiniMap] = useState(true);
 
   // Initialize user if not logged in
   useEffect(() => {
@@ -233,13 +234,17 @@ export const DiagramView: React.FC = () => {
             )}
           </div>
           
-          <ToolbarClean onOpenAIChat={() => setIsAIChatOpen(true)} />
+          <ToolbarClean
+            onOpenAIChat={() => setIsAIChatOpen(true)}
+            showMiniMap={showMiniMap}
+            onToggleMiniMap={() => setShowMiniMap(!showMiniMap)}
+          />
         </div>
       </div>
       
       <div className="flex flex-1 overflow-hidden relative">
         <ReactFlowProvider>
-          <Canvas />
+          <Canvas showMiniMap={showMiniMap} />
           <PropertyPanel />
           <CollaboratorCursors />
           

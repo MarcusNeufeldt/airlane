@@ -55,7 +55,8 @@
       "Bash(npx tsc:*)",
       "Bash(set PORT=3002)",
       "Bash(git branch:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "WebFetch(domain:signavio.vercel.app)"
     ],
     "deny": [],
     "ask": [],

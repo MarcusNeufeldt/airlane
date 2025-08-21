@@ -605,6 +605,29 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
 
     setSearchQuery: (query) => {
       set({ searchQuery: query });
+      // Automatically perform search when query changes
+      const lowerQuery = query.toLowerCase();
+      const results = get().nodes.filter(node => {
+        const data = node.data as any;
+        if (data.label && data.label.toLowerCase().includes(lowerQuery)) {
+          return true;
+        }
+        if (data.description && data.description.toLowerCase().includes(lowerQuery)) {
+          return true;
+        }
+        if (data.content && data.content.toLowerCase().includes(lowerQuery)) {
+          return true;
+        }
+        if (data.text && data.text.toLowerCase().includes(lowerQuery)) {
+          return true;
+        }
+        return false;
+      }).map(node => node.id);
+
+      set({
+        searchResults: results,
+        currentSearchIndex: results.length > 0 ? 0 : -1,
+      });
     },
 
     setSearchOpen: (isOpen) => {
@@ -649,11 +672,16 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
     },
 
     navigateToSearchResult: (index) => {
-      const { searchResults } = get();
+      const { searchResults, selectedNodeIds } = get();
       if (index >= 0 && index < searchResults.length) {
         set({ currentSearchIndex: index });
         const nodeId = searchResults[index];
-        get().selectNode(nodeId);
+        // Add the search result to current selection without losing existing selections
+        if (!selectedNodeIds.includes(nodeId)) {
+          set({ selectedNodeIds: [...selectedNodeIds, nodeId] });
+        }
+        // Also set as the focused node
+        set({ selectedNodeId: nodeId });
       }
     },
 
