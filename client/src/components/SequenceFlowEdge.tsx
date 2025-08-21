@@ -16,7 +16,7 @@ export const SequenceFlowEdge: React.FC<EdgeProps> = ({
   data,
   selected,
 }) => {
-  const { updateEdge, removeEdge } = useDiagramStore();
+  const { updateEdge, removeEdge, simulationActiveEdges, isSimulating } = useDiagramStore();
   const [isEditing, setIsEditing] = useState(false);
   const [condition, setCondition] = useState(data?.condition || '');
 
@@ -57,11 +57,16 @@ export const SequenceFlowEdge: React.FC<EdgeProps> = ({
         id={id}
         style={{
           ...style,
-          stroke: selected ? '#3b82f6' : '#64748b',
-          strokeWidth: selected ? 3 : 2,
+          stroke: selected ? '#3b82f6' :
+                  simulationActiveEdges.includes(id) && isSimulating ? '#10b981' : '#64748b',
+          strokeWidth: selected ? 3 :
+                       simulationActiveEdges.includes(id) && isSimulating ? 4 : 2,
           strokeDasharray: data?.type === 'conditional' ? '5,5' : 'none',
+          filter: simulationActiveEdges.includes(id) && isSimulating ? 'drop-shadow(0 0 4px #10b981)' : 'none',
         }}
-        className="react-flow__edge-path hover:stroke-blue-500 transition-colors"
+        className={`react-flow__edge-path hover:stroke-blue-500 transition-all duration-300 ${
+          simulationActiveEdges.includes(id) && isSimulating ? 'animate-pulse' : ''
+        }`}
         d={edgePath}
         markerEnd={markerEnd}
       />

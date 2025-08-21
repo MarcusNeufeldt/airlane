@@ -10,6 +10,7 @@ import { CollaboratorCursors } from './CollaboratorCursors';
 import { WelcomeModal } from './WelcomeModal';
 import { AIChatPanel } from './AIChatPanel';
 import ReadOnlyBanner from './ReadOnlyBanner';
+import { SimulationPanel } from './SimulationPanel';
 import { useCollaborationStore } from '../stores/collaborationStore';
 import { useDiagramStore } from '../stores/diagramStore';
 // import { useDiagramLocking } from '../hooks/useDiagramLocking'; // Disabled until backend is ready
@@ -26,6 +27,7 @@ export const DiagramView: React.FC = () => {
   const [diagramInfo, setDiagramInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showMiniMap, setShowMiniMap] = useState(true);
+  const [isSimulationOpen, setIsSimulationOpen] = useState(false);
 
   // Initialize user if not logged in
   useEffect(() => {
@@ -238,6 +240,7 @@ export const DiagramView: React.FC = () => {
             onOpenAIChat={() => setIsAIChatOpen(true)}
             showMiniMap={showMiniMap}
             onToggleMiniMap={() => setShowMiniMap(!showMiniMap)}
+            onOpenSimulation={() => setIsSimulationOpen(true)}
           />
         </div>
       </div>
@@ -248,7 +251,7 @@ export const DiagramView: React.FC = () => {
           <PropertyPanel />
           <CollaboratorCursors />
           
-          {/* Validation Panel - Fixed position in bottom-right */}
+          {/* Right Panel - Validation */}
           <div className="absolute bottom-4 right-4 w-64 max-w-sm z-10">
             <ValidationPanel />
           </div>
@@ -259,6 +262,10 @@ export const DiagramView: React.FC = () => {
       <AIChatPanel
         isOpen={isAIChatOpen}
         onClose={() => setIsAIChatOpen(false)}
+      />
+      <SimulationPanel
+        isOpen={isSimulationOpen}
+        onClose={() => setIsSimulationOpen(false)}
       />
     </div>
   );

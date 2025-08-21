@@ -4,7 +4,7 @@ import {
   Grid3x3, StickyNote, Square, Circle, Diamond, ChevronDown,
   FileText, Shapes, Settings, Eye, Maximize2, Focus, Search,
   GitBranch, Activity, Users, Building2, Database, StopCircle, PlayCircle,
-  Keyboard
+  Keyboard, Play
 } from 'lucide-react';
 // Removed useReactFlow import to avoid context issues
 import { useDiagramStore } from '../stores/diagramStore';
@@ -18,9 +18,10 @@ interface ToolbarProps {
   onOpenAIChat: () => void;
   showMiniMap?: boolean;
   onToggleMiniMap?: () => void;
+  onOpenSimulation?: () => void;
 }
 
-export const ToolbarClean: React.FC<ToolbarProps> = ({ onOpenAIChat, showMiniMap, onToggleMiniMap }) => {
+export const ToolbarClean: React.FC<ToolbarProps> = ({ onOpenAIChat, showMiniMap, onToggleMiniMap, onOpenSimulation }) => {
   const { 
     addNode, 
     nodes, 
@@ -46,7 +47,9 @@ export const ToolbarClean: React.FC<ToolbarProps> = ({ onOpenAIChat, showMiniMap
     setShowShapeMenu,
     setShowViewMenu,
     setShowLaneColors,
-    setSearchOpen
+    setSearchOpen,
+    isSimulating,
+    simulationPaused
   } = useDiagramStore();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -629,6 +632,50 @@ export const ToolbarClean: React.FC<ToolbarProps> = ({ onOpenAIChat, showMiniMap
           <Bot size={16} />
           <span className="text-sm">AI Assistant</span>
         </button>
+
+        {/* Process Simulation */}
+        <div className="flex items-center space-x-2">
+          {/* Simulation Status Indicator */}
+          {isSimulating && (
+            <div className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 border border-gray-300 rounded">
+              <div className={`w-2 h-2 rounded-full animate-pulse ${
+                simulationPaused ? 'bg-yellow-500' : 'bg-green-500'
+              }`} />
+              <span className="text-xs text-gray-700">
+                Sim: {simulationPaused ? 'Paused' : 'Running'}
+              </span>
+            </div>
+          )}
+
+          <div className="flex items-center space-x-1">
+            {/* Background Simulation */}
+            <button
+              onClick={() => {
+                const { startSimulationBackground } = useDiagramStore.getState();
+                startSimulationBackground();
+              }}
+              disabled={isReadOnly}
+              className="flex items-center space-x-1 px-3 py-1.5 bg-green-500 text-white rounded hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400"
+              title={isReadOnly ? "Simulation is disabled in read-only mode" : "Start simulation in background"}
+            >
+              <Play size={16} />
+              <span className="text-sm">Start Sim</span>
+            </button>
+
+            {/* Full Simulation Panel */}
+            {onOpenSimulation && (
+              <button
+                onClick={onOpenSimulation}
+                disabled={isReadOnly}
+                className="flex items-center space-x-1 px-3 py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400"
+                title={isReadOnly ? "Simulation is disabled in read-only mode" : "Open full simulation panel"}
+              >
+                <Settings size={16} />
+                <span className="text-sm">Sim Panel</span>
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Dialogs */}

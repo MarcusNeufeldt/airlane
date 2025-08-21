@@ -5,7 +5,7 @@ import { useDiagramStore } from '../stores/diagramStore';
 import { Settings, MoreHorizontal, User, Cog, Hand, Code, Calculator, Send, Download } from 'lucide-react';
 
 export const ProcessNode: React.FC<NodeProps<ProcessNodeData>> = ({ id, data, selected }) => {
-  const { updateNode, showLaneColors } = useDiagramStore();
+  const { updateNode, showLaneColors, simulationActiveNodes, isSimulating } = useDiagramStore();
   const [isEditing, setIsEditing] = useState(false);
   const [label, setLabel] = useState(data.label);
 
@@ -85,7 +85,8 @@ export const ProcessNode: React.FC<NodeProps<ProcessNodeData>> = ({ id, data, se
       
       <div
         className={`bg-white rounded-lg shadow-lg border-2 transition-all duration-150 hover:shadow-xl ${
-          selected ? 'border-blue-500 ring-2 ring-blue-200' : 
+          selected ? 'border-blue-500 ring-2 ring-blue-200' :
+          simulationActiveNodes.includes(id) && isSimulating ? 'border-green-500 ring-2 ring-green-200 bg-green-50 animate-pulse' :
           (showLaneColors && data.laneColor ? `border-[${data.laneColor}]` : 'border-gray-300')
         } ${
           isSubprocess ? 'border-dashed border-blue-400' : ''

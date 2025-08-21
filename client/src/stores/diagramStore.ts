@@ -23,6 +23,17 @@ import {
 } from '../types';
 import * as Y from 'yjs';
 
+// Simulation interfaces
+interface SimulationToken {
+  id: string;
+  currentNodeId: string;
+  path: string[];
+  data: Record<string, any>;
+  status: 'active' | 'waiting' | 'completed' | 'terminated';
+}
+
+
+
 interface HistoryState {
   nodes: Node[];
   edges: Edge[];
@@ -63,6 +74,14 @@ interface UIState {
   searchResults: string[];
   currentSearchIndex: number;
   isSearchOpen: boolean;
+  // Simulation state
+  isSimulating: boolean;
+  simulationActiveNodes: string[];
+  simulationActiveEdges: string[];
+  simulationTokens: SimulationToken[];
+  simulationSpeed: number;
+  simulationPaused: boolean;
+
 }
 
 interface DiagramState extends UIState {
@@ -99,6 +118,15 @@ interface DiagramState extends UIState {
   flashTable: (tableId: string) => void;
   addStickyNote: (position: { x: number; y: number }) => void;
   addShape: (position: { x: number; y: number }, shapeType: 'rectangle' | 'circle' | 'diamond') => void;
+
+  // Simulation functions
+  startSimulation: () => void;
+  startSimulationBackground: () => void;
+  pauseSimulation: () => void;
+  stopSimulation: () => void;
+  stepSimulation: () => void;
+  resetSimulation: () => void;
+  setSimulationSpeed: (speed: number) => void;
   toggleNodeSelection: (nodeId: string) => void;
   initializeYjs: (doc: Y.Doc) => void;
   syncFromYjs: () => void;
@@ -188,6 +216,13 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
     searchResults: [],
     currentSearchIndex: -1,
     isSearchOpen: false,
+    // Simulation state
+    isSimulating: false,
+    simulationActiveNodes: [],
+    simulationActiveEdges: [],
+    simulationTokens: [],
+    simulationSpeed: 1000,
+    simulationPaused: false,
 
     // History Management
     undo: () => {
@@ -593,6 +628,260 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
 
     setShowLaneColors: (show) => {
       set({ showLaneColors: show });
+    },
+
+    // Simulation methods
+    startSimulation: () => {
+      const { nodes } = get();
+      const startEvents = nodes.filter(node => node.type === 'event' && (node.data as any).eventType === 'start');
+
+      if (startEvents.length === 0) {
+        alert('No start events found. Add a start event to begin simulation.');
+        return;
+      }
+
+      const token: SimulationToken = {
+        id: `token-${Date.now()}`,
+        currentNodeId: startEvents[0].id,
+        path: [startEvents[0].id],
+        data: {},
+        status: 'active'
+      };
+
+      set({
+        isSimulating: true,
+        simulationPaused: false,
+        simulationTokens: [token],
+        simulationActiveNodes: [startEvents[0].id],
+        simulationActiveEdges: []
+      });
+
+      // Auto-advance to first task
+      setTimeout(() => {
+        if (!get().simulationPaused) {
+          get().stepSimulation();
+        }
+      }, get().simulationSpeed);
+    },
+
+    startSimulationBackground: () => {
+      const { nodes, addNotification } = get();
+      const startEvents = nodes.filter(node => node.type === 'event' && (node.data as any).eventType === 'start');
+
+      if (startEvents.length === 0) {
+        alert('No start events found. Add a start event to begin simulation.');
+        return;
+      }
+
+      const token: SimulationToken = {
+        id: `token-${Date.now()}`,
+        currentNodeId: startEvents[0].id,
+        path: [startEvents[0].id],
+        data: {},
+        status: 'active'
+      };
+
+      set({
+        isSimulating: true,
+        simulationPaused: false,
+        simulationTokens: [token],
+        simulationActiveNodes: [startEvents[0].id],
+        simulationActiveEdges: []
+      });
+
+      // Add notification for background simulation
+      addNotification('info', '🎬 Simulation started - watch the process flow!', 3000);
+
+      // Auto-advance to first task
+      setTimeout(() => {
+        if (!get().simulationPaused) {
+          get().stepSimulation();
+        }
+      }, get().simulationSpeed);
+    },
+
+    pauseSimulation: () => {
+      set({ simulationPaused: true });
+    },
+
+    stopSimulation: () => {
+      set({
+        isSimulating: false,
+        simulationPaused: false,
+        simulationTokens: [],
+        simulationActiveNodes: [],
+        simulationActiveEdges: []
+      });
+    },
+
+    stepSimulation: () => {
+      const { simulationTokens, nodes, edges, simulationSpeed } = get();
+
+      console.log('🎬 Step simulation:', {
+        totalTokens: simulationTokens.length,
+        activeTokens: simulationTokens.filter(t => t.status === 'active').length,
+        completedTokens: simulationTokens.filter(t => t.status === 'completed').length
+      });
+
+      if (simulationTokens.length === 0 || get().simulationPaused) return;
+
+      const activeTokens = simulationTokens.filter(token => token.status === 'active');
+      if (activeTokens.length === 0) {
+        set({ isSimulating: false });
+        return;
+      }
+
+      // Process each active token
+      activeTokens.forEach(token => {
+        const currentNode = nodes.find(n => n.id === token.currentNodeId);
+        if (!currentNode) return;
+
+        // Find outgoing edges
+        const outgoingEdges = edges.filter(edge => edge.source === currentNode.id);
+        if (outgoingEdges.length === 0) {
+          // End of path - mark token as completed
+          token.status = 'completed';
+          return;
+        }
+
+        // Handle different gateway types
+        let nextNodeId: string | null = null;
+        const currentNodeData = currentNode.data as any;
+
+        if (currentNode.type === 'gateway') {
+          const gatewayType = currentNodeData.gatewayType;
+
+          switch (gatewayType) {
+            case 'exclusive':
+              // Exclusive gateway - take first unconditional path or default
+              const defaultEdge = outgoingEdges.find(edge => (edge.data as any)?.isDefault);
+              nextNodeId = defaultEdge ? defaultEdge.target : outgoingEdges[0]?.target;
+              break;
+
+            case 'parallel':
+              console.log('🔀 Parallel gateway:', {
+                nodeId: currentNode.id,
+                outgoingEdges: outgoingEdges.length,
+                tokenId: token.id
+              });
+
+              // Parallel gateway - create multiple tokens for each path
+              const newTokens: SimulationToken[] = [];
+
+              outgoingEdges.forEach((edge, index) => {
+                const parallelToken: SimulationToken = {
+                  id: `token-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`,
+                  currentNodeId: edge.target,
+                  path: [...token.path, edge.target],
+                  data: { ...token.data },
+                  status: 'active'
+                };
+                newTokens.push(parallelToken);
+              });
+
+              console.log('🚀 Created parallel tokens:', newTokens.map(t => ({ id: t.id, target: t.currentNodeId })));
+
+              // Replace the current token with the new parallel tokens
+              const updatedTokens = [...simulationTokens.filter(t => t.id !== token.id), ...newTokens];
+
+              // Update active nodes to include all parallel targets
+              const newActiveNodes = [...get().simulationActiveNodes];
+              const currentIndex = newActiveNodes.indexOf(currentNode.id);
+              if (currentIndex > -1) {
+                newActiveNodes.splice(currentIndex, 1); // Remove the gateway
+              }
+              newTokens.forEach(newToken => {
+                newActiveNodes.push(newToken.currentNodeId);
+              });
+
+              set({
+                simulationTokens: updatedTokens,
+                simulationActiveNodes: newActiveNodes
+              });
+
+              console.log('✅ Parallel gateway processed, new active nodes:', newActiveNodes);
+
+              // Continue simulation with the new parallel tokens
+              setTimeout(() => {
+                if (!get().simulationPaused && get().isSimulating) {
+                  get().stepSimulation();
+                }
+              }, simulationSpeed);
+
+              return;
+
+            case 'inclusive':
+              // Inclusive gateway - take all paths (simplified implementation)
+              nextNodeId = outgoingEdges[0]?.target;
+              break;
+
+            default:
+              nextNodeId = outgoingEdges[0]?.target;
+          }
+        } else {
+          // Regular task/event - follow first path
+          nextNodeId = outgoingEdges[0]?.target;
+        }
+
+        if (!nextNodeId) {
+          token.status = 'completed';
+          return;
+        }
+
+        const nextNode = nodes.find(n => n.id === nextNodeId);
+
+        if (nextNode) {
+          token.currentNodeId = nextNodeId;
+          token.path.push(nextNodeId);
+
+          // Find the edge that was traversed
+          const traversedEdge = outgoingEdges.find(edge => edge.target === nextNodeId);
+          const newActiveEdges = traversedEdge ? [traversedEdge.id] : [];
+
+          // Update active nodes
+          const newActiveNodes = [...get().simulationActiveNodes];
+          const currentIndex = newActiveNodes.indexOf(currentNode.id);
+          if (currentIndex > -1) {
+            newActiveNodes[currentIndex] = nextNodeId;
+          } else {
+            newActiveNodes.push(nextNodeId);
+          }
+
+          set({
+            simulationActiveNodes: newActiveNodes,
+            simulationActiveEdges: newActiveEdges
+          });
+
+          // Check if this is an end event
+          if (nextNode.type === 'event' && (nextNode.data as any).eventType === 'end') {
+            token.status = 'completed';
+          }
+
+          // Continue simulation if not paused
+          if (!get().simulationPaused && get().isSimulating) {
+            setTimeout(() => {
+              get().stepSimulation();
+            }, simulationSpeed);
+          }
+        }
+      });
+
+      // Update tokens
+      set({ simulationTokens: [...simulationTokens] });
+    },
+
+    resetSimulation: () => {
+      set({
+        isSimulating: false,
+        simulationPaused: false,
+        simulationTokens: [],
+        simulationActiveNodes: [],
+        simulationActiveEdges: []
+      });
+    },
+
+    setSimulationSpeed: (speed: number) => {
+      set({ simulationSpeed: speed });
     },
 
     closeAllDropdowns: () => {
