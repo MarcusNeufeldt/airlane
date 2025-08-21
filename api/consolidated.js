@@ -390,6 +390,23 @@ module.exports = async (req, res) => {
       }
     }
     
+    if (method === 'POST' && url.includes('/summarize-process')) {
+        try {
+            const { process } = body;
+            if (!process || !process.elements || process.elements.length === 0) {
+                return res.status(400).json({ error: 'Process model is required and must not be empty.' });
+            }
+            console.log('🔬 Summarizing process...');
+            const aiService = new AIService();
+            const summary = await aiService.summarizeProcess(process);
+            console.log('✅ Summary generated.');
+            return res.json({ summary });
+        } catch (error) {
+            console.error('❌ Process summarization failed:', error.message);
+            return res.status(500).json({ error: 'Failed to summarize process', details: error.message });
+        }
+    }
+    
     // Legacy Route: POST /analyze-schema (for backward compatibility)
     if (method === 'POST' && url.includes('/analyze-schema')) {
       try {

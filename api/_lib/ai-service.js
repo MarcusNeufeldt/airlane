@@ -531,6 +531,42 @@ Format your response in clear markdown with proper headers and bullet points.`;
     }
   }
 
+  async summarizeProcess(process) {
+      try {
+        console.log('📝 Starting process summarization');
+        const prompt = `You are an expert BPMN process analyst. Analyze the following BPMN process model and provide a very concise, one-paragraph summary (maximum 3-4 sentences). 
+        
+        Your summary should describe the main purpose, key stages, and primary outcome of the process. 
+        
+        CRITICAL: Respond ONLY with the plain text summary. Do not use formatting, markdown, lists, or introductory phrases like "This process describes...".
+  
+        Process Model:
+        ${JSON.stringify(process, null, 2)}`;
+        
+        const response = await axios.post(`${this.baseURL}/chat/completions`, {
+          model: this.defaultModel,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.2,
+          max_tokens: 150,
+        }, {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://signavio.vercel.app',
+            'X-Title': 'BPMN Process Modeling Tool'
+          }
+        });
+        
+        const summary = response.data.choices[0].message.content.trim();
+        console.log('✅ Summarization complete:', summary);
+        return summary;
+  
+      } catch (error) {
+        console.error('Process Summarization Error:', error.response?.data || error.message);
+        throw new Error(`Process summarization failed: ${error.response?.data?.error?.message || error.message}`);
+      }
+  }
+
   // Analyze current schema and provide suggestions (direct API call, no tools)
   async analyzeSchema(schema) {
     try {

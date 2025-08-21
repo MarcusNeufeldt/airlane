@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 
 export interface ProcessModel {
   elements: ProcessElement[];
@@ -166,6 +166,24 @@ class AIService {
     const data = await response.json();
     console.log('🗑️ Chat history cleared:', data);
     return { success: data.success, deletedCount: data.deletedCount };
+  }
+
+  async summarizeProcess(process: ProcessModel): Promise<string> {
+      console.log('📝 Requesting process summary from backend...');
+      const response = await fetch(`${API_BASE_URL}/summarize-process`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ process }),
+      });
+  
+      if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to summarize process');
+      }
+  
+      const data = await response.json();
+      console.log('✅ Received summary:', data.summary);
+      return data.summary;
   }
 
   async generateProcess(prompt: string, existingProcess?: ProcessModel): Promise<ProcessModel> {

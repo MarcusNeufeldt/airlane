@@ -22,7 +22,8 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
     importDiagram,
     flashTable,
     isReadOnly,
-    currentDiagramId
+    currentDiagramId,
+    addStickyNote
   } = useDiagramStore();
 
   const scrollToBottom = () => {
@@ -1056,6 +1057,56 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
     }
   };
 
+  const handleSummarizeProcess = async () => {
+      const currentProcess = getCurrentProcess();
+      if (!currentProcess || currentProcess.elements.length === 0) {
+          const errorMessage: ChatMessage = {
+              role: 'assistant',
+              content: 'There is no process on the canvas to summarize. Please add some elements first.',
+              timestamp: new Date(),
+          };
+          setMessages(prev => [...prev, errorMessage]);
+          return;
+      }
+
+      setIsGenerating(true);
+      const thinkingMessage: ChatMessage = {
+          role: 'assistant',
+          content: 'Analyzing your process to create a summary...',
+          timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, thinkingMessage]);
+
+      try {
+          const summary = await aiService.summarizeProcess(currentProcess);
+
+          // Find a good position for the sticky note (e.g., near the start event)
+          const startEvent = nodes.find(n => n.type === 'event' && n.data.eventType === 'start');
+          const position = startEvent 
+              ? { x: startEvent.position.x - 220, y: startEvent.position.y } 
+              : { x: 50, y: 50 };
+
+          addStickyNote(position, summary);
+          
+          const successMessage: ChatMessage = {
+              role: 'assistant',
+              content: `✅ I've summarized the process and added it to a sticky note on your canvas.`,
+              timestamp: new Date(),
+          };
+          setMessages(prev => [...prev, successMessage]);
+
+      } catch (error) {
+          const errorMessage: ChatMessage = {
+              role: 'assistant',
+              content: `Failed to summarize the process: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              timestamp: new Date(),
+          };
+          setMessages(prev => [...prev, errorMessage]);
+      } finally {
+          setIsGenerating(false);
+      }
+  };
+
   const handleResetChat = async () => {
     if (!currentDiagramId) {
       console.warn('No diagram ID available for resetting chat');
@@ -1168,6 +1219,10 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
     {
       label: 'Analyze Current Process',
       action: handleAnalyzeProcess,
+    },
+    {
+      label: 'Summarize Process on Sticky Note',
+      action: handleSummarizeProcess,
     },
   ];
 

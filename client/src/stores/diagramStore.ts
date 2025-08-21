@@ -117,7 +117,7 @@ interface DiagramState extends UIState {
   
   // All other UI/notification/locking functions
   flashTable: (tableId: string) => void;
-  addStickyNote: (position: { x: number; y: number }) => void;
+  addStickyNote: (position: { x: number; y: number }, content?: string) => void;
   addShape: (position: { x: number; y: number }, shapeType: 'rectangle' | 'circle' | 'diamond') => void;
 
   // Simulation functions
@@ -493,7 +493,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
         const nodeMap = new Map(newNodes.map(n => [n.id, n]));
     
         // 2. Layout nodes within each container (lane)
-        for (const [parentId, childrenIds] of parentMap.entries()) {
+        for (const [parentId, childrenIds] of Array.from(parentMap.entries())) {
           const containerNodes = childrenIds.map(id => nodeMap.get(id)!);
           const containerEdges = edges.filter(e => childrenIds.includes(e.source) && childrenIds.includes(e.target));
     
@@ -603,23 +603,23 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
       }, 2000);
     },
 
-    addStickyNote: (position) => {
+    addStickyNote: (position, content = 'New Note') => { // Add content parameter with default
       const { snapToGrid, gridSize } = get();
       const snappedPosition = snapToGridPosition(position, gridSize, snapToGrid);
       const id = `sticky-${Date.now()}`;
       const stickyData: StickyNoteData = {
-        id,
-        nodeType: 'sticky-note',
-        content: 'New Note',
-        color: '#fef3c7',
-        width: 200,
-        height: 150,
+          id,
+          nodeType: 'sticky-note',
+          content, // <-- Use the passed content
+          color: '#FFF9C4',
+          width: 200,
+          height: 150,
       };
       const newNode: Node = {
-        id,
-        type: 'sticky-note',
-        position: snappedPosition,
-        data: stickyData,
+          id,
+          type: 'sticky-note',
+          position: snappedPosition,
+          data: stickyData,
       };
       setStateWithHistory({ nodes: [...get().nodes, newNode] }, 'Add Sticky Note');
     },
