@@ -5,7 +5,7 @@ import { useDiagramStore } from '../stores/diagramStore';
 import { X, Plus, Circle, Zap, Settings } from 'lucide-react';
 
 export const GatewayNode: React.FC<NodeProps<GatewayNodeData>> = ({ id, data, selected }) => {
-  const { updateNode, showLaneColors, simulationActiveNodes, isSimulating } = useDiagramStore();
+  const { updateNode, showLaneColors, simulationActiveNodes, isSimulating, animatingNodeIds } = useDiagramStore();
   const [isEditing, setIsEditing] = useState(false);
   const [label, setLabel] = useState(data.label);
 
@@ -27,6 +27,8 @@ export const GatewayNode: React.FC<NodeProps<GatewayNodeData>> = ({ id, data, se
       handleLabelBlur();
     }
   };
+
+  const isAnimating = animatingNodeIds.has(id);
 
   const getGatewayIcon = () => {
     switch (data.gatewayType) {
@@ -102,6 +104,7 @@ export const GatewayNode: React.FC<NodeProps<GatewayNodeData>> = ({ id, data, se
       
       <div
         className={`bg-yellow-100 shadow-lg flex items-center justify-center transform rotate-45 transition-all duration-150 hover:shadow-xl ${
+          isAnimating ? 'ring-2 ring-purple-500 animate-pulse' :
           selected ? 'ring-2 ring-yellow-600' :
           simulationActiveNodes.includes(id) && isSimulating ? 'ring-2 ring-green-400 animate-pulse bg-green-50' : ''
         }`}

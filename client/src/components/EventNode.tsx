@@ -5,7 +5,7 @@ import { useDiagramStore } from '../stores/diagramStore';
 import { Play, Square, Circle } from 'lucide-react';
 
 export const EventNode: React.FC<NodeProps<EventNodeData>> = ({ id, data, selected }) => {
-  const { updateNode, showLaneColors, simulationActiveNodes, isSimulating } = useDiagramStore();
+  const { updateNode, showLaneColors, simulationActiveNodes, isSimulating, animatingNodeIds } = useDiagramStore();
   const [isEditing, setIsEditing] = useState(false);
   const [label, setLabel] = useState(data.label);
 
@@ -27,6 +27,7 @@ export const EventNode: React.FC<NodeProps<EventNodeData>> = ({ id, data, select
       handleLabelBlur();
     }
   };
+  const isAnimating = animatingNodeIds.has(id);
   const getEventStyles = () => {
     switch (data.eventType) {
       case 'start':
@@ -138,6 +139,7 @@ export const EventNode: React.FC<NodeProps<EventNodeData>> = ({ id, data, select
       
       <div
         className={`rounded-full shadow-lg flex flex-col items-center justify-center transition-all duration-150 hover:shadow-xl ${
+          isAnimating ? 'ring-2 ring-purple-500 animate-pulse' :
           selected ? 'ring-2 ring-blue-400' :
           simulationActiveNodes.includes(id) && isSimulating ? 'ring-2 ring-green-400 animate-pulse' : ''
         }`}

@@ -101,40 +101,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ onCreateDiagram }) => {
       currentUser = await userService.promptForUser();
       setUser(currentUser);
     }
-
-    if (!currentUser) {
-      // User cancelled the prompt or login failed
-      return;
-    }
+    if (!currentUser) { return; }
 
     try {
       const name = prompt('Enter diagram name:');
       if (!name || !name.trim()) return;
 
-      // Create new diagram in cloud database
-      const diagramId = `diagram-${Date.now()}`;
-      
       const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
-      const response = await fetch(`${API_BASE_URL}/diagram?id=${diagramId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await fetch(`${API_BASE_URL}/diagrams`, { // POST request
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', },
         body: JSON.stringify({
           name: name.trim(),
           nodes: [],
           edges: [],
-          userId: currentUser.id
-        })
+          ownerId: currentUser.id,
+          ownerName: currentUser.name,
+          ownerEmail: currentUser.email,
+        }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.message || `Failed to create diagram: ${response.status}`);
+      if (response.ok) {
+        const newDiagram = await response.json();
+        setDiagrams(prev => [newDiagram, ...prev]);
+        window.location.href = `/diagram/${newDiagram.id}`; // Redirect to server-generated ID
+      } else {
+        throw new Error('Failed to create diagram');
       }
-
-      // Navigate to the new diagram
-      window.location.href = `/diagram/${diagramId}`;
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to create diagram');
     }

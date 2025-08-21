@@ -21,7 +21,8 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
     edges, 
     importDiagram,
     flashTable,
-    isReadOnly
+    isReadOnly,
+    currentDiagramId
   } = useDiagramStore();
 
   const scrollToBottom = () => {
@@ -34,15 +35,40 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
 
   // Initialize chat with greeting message (no backend for now)
   useEffect(() => {
-    if (isOpen) {
-      // Always show the initial greeting for now (no backend chat history)
-      setMessages([{ 
-        role: 'assistant', 
-        content: "Hi! I'm Process Modeler AI, your intelligent assistant for this visual BPMN process modeling tool. I can help you create business processes, modify tasks and flows on the canvas, and analyze your process designs. I understand the visual connections between your process elements and will help maintain them as we work together. What process would you like to model today?", 
-        timestamp: new Date() 
+    if (isOpen && currentDiagramId) {
+      console.log(`📜 Loading chat history for diagram: ${currentDiagramId}`);
+      setIsLoading(true);
+      aiService.getChatHistory(currentDiagramId)
+        .then(history => {
+          console.log(`📜 Loaded ${history.length} chat messages`);
+          if (history.length === 0) {
+            setMessages([{
+              role: 'assistant',
+              content: "Hi! I'm Process Modeler AI, your intelligent assistant for this visual BPMN process modeling tool. I can help you create business processes, modify tasks and flows on the canvas, and analyze your process designs. I understand the visual connections between your process elements and will help maintain them as we work together. What process would you like to model today?",
+              timestamp: new Date()
+            }]);
+          } else {
+            setMessages(history);
+          }
+        })
+        .catch(err => {
+          console.error('❌ Error loading chat history:', err);
+          const errorMessage: ChatMessage = {
+            role: 'assistant',
+            content: `Error loading chat history: ${err.message}. Starting fresh conversation.`,
+            timestamp: new Date()
+          };
+          setMessages([errorMessage]);
+        })
+        .finally(() => setIsLoading(false));
+    } else if (isOpen && !currentDiagramId) {
+      setMessages([{
+        role: 'assistant',
+        content: "Please open a diagram to start chatting with the AI assistant.",
+        timestamp: new Date()
       }]);
     }
-  }, [isOpen]);
+  }, [isOpen, currentDiagramId]);
 
   // Convert current diagram to ProcessModel format
   const getCurrentProcess = (): ProcessModel | undefined => {
@@ -554,64 +580,174 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
 
   // Apply process changes to the canvas
   const applyProcessChanges = (processModel: ProcessModel, isModification: boolean = false) => {
-    console.log('🔄 applyProcessChanges called:', { 
-      isModification, 
-      nodeCount: nodes.length, 
-      processModel,
-      flows: processModel.flows 
-    });
-    
-    // For now, convert the ProcessModel to the existing diagram format
-    // This is a simplified conversion - in a full implementation, you'd want more sophisticated mapping
-    const newNodes = processModel.elements.map((element, index) => ({
-      id: element.id,
-      type: element.type,
-      position: element.position,
-      data: {
+    console.log('🔄 applyProcessChanges called:', { isModification, nodeCount: nodes.length, processModel });
+
+    if (!isModification || nodes.length === 0) {
+      console.log('📋 Performing full process replacement');
+      const newNodes = processModel.elements.map((element) => ({
         id: element.id,
-        nodeType: element.type,
-        label: element.label,
-        description: element.description,
-        ...element.properties
-      }
-    }));
+        type: element.type as any,
+        position: element.position,
+        data: {
+          id: element.id,
+          nodeType: element.type,
+          label: element.label,
+          description: element.description,
+          ...element.properties
+        },
+      }));
+      const newEdges = processModel.flows.map(flow => ({
+        id: flow.id,
+        type: flow.type,
+        source: flow.source,
+        target: flow.target,
+        data: {
+          label: flow.label,
+          condition: flow.condition,
+          isDefault: flow.isDefault,
+          messageType: flow.messageType
+        }
+      }));
+      importDiagram({ nodes: newNodes, edges: newEdges });
+      return;
+    }
 
-    const newEdges = processModel.flows.map(flow => ({
-      id: flow.id,
-      type: flow.type,
-      source: flow.source,
-      target: flow.target,
-      data: {
-        label: flow.label,
-        condition: flow.condition,
-        isDefault: flow.isDefault,
-        messageType: flow.messageType
-      }
-    }));
-
-    console.log('🔄 Applying process changes to canvas:', {
-      nodes: newNodes.length,
-      edges: newEdges.length
-    });
-
-    importDiagram({ nodes: newNodes, edges: newEdges });
+    const currentProcess = getCurrentProcess();
+    if (!currentProcess) {
+      // Fallback if we can't get current state
+      applyProcessChanges(processModel, false);
+      return;
+    }
     
-    // Flash the affected elements for visual feedback
-    newNodes.forEach(node => {
-      flashTable(node.id);
+    console.log('🔄 Performing atomic incremental update for process model');
+    const finalState = computeFinalProcessState(currentProcess, processModel);
+    
+    console.log('✅ Final state computed:', { nodes: finalState.nodes.length, edges: finalState.edges.length, affected: finalState.affectedElementIds.length });
+    importDiagram({ nodes: finalState.nodes, edges: finalState.edges });
+    finalState.affectedElementIds.forEach(id => {
+      flashTable(id);
     });
   };
 
+  const computeFinalProcessState = (currentProcess: ProcessModel, newProcess: ProcessModel) => {
+    // Map existing nodes by their label to preserve position and other properties
+    const currentNodeMap = new Map(nodes.map((n) => [n.data.label, n]));
+    const currentElementsMap = new Map(currentProcess.elements.map(e => [e.label, e]));
+    
+    const affectedElementIds: string[] = [];
+    const finalNodes: any[] = [];
+    const elementLabelToId = new Map<string, string>();
+
+    // Process elements from the new AI-generated model
+    newProcess.elements.forEach((newElement) => {
+      const existingNode = currentNodeMap.get(newElement.label);
+
+      if (existingNode) {
+        // This element exists, merge properties but keep position
+        console.log(`🔧 Merging element: ${newElement.label}`);
+        const modifiedNode = {
+          ...existingNode,
+          // Update data from AI, but keep existing position
+          data: {
+            ...existingNode.data,
+            ...newElement.properties, // Apply new properties
+            label: newElement.label,
+            description: newElement.description,
+          },
+        };
+        finalNodes.push(modifiedNode);
+        elementLabelToId.set(newElement.label, modifiedNode.id);
+        affectedElementIds.push(modifiedNode.id);
+      } else {
+        // This is a new element, add it with a default position
+        console.log(`+ Adding new element: ${newElement.label}`);
+        const newNode = {
+          id: newElement.id || `node-${Date.now()}-${finalNodes.length}`,
+          type: newElement.type,
+          position: {
+            x: 150 + (finalNodes.length % 4) * 200,
+            y: 150 + Math.floor(finalNodes.length / 4) * 150,
+          },
+          data: {
+            id: newElement.id || `node-${Date.now()}-${finalNodes.length}`,
+            nodeType: newElement.type,
+            label: newElement.label,
+            description: newElement.description,
+            ...newElement.properties,
+          },
+        };
+        finalNodes.push(newNode);
+        elementLabelToId.set(newElement.label, newNode.id);
+        affectedElementIds.push(newNode.id);
+      }
+    });
+
+    // Create sets of flow signatures for easy comparison
+    const getFlowKey = (flow: { source: string; target: string; }) => `${flow.source}->${flow.target}`;
+    const currentFlowKeys = new Set(currentProcess.flows.map(getFlowKey));
+    const newFlowKeys = new Set(newProcess.flows.map(getFlowKey));
+
+    const finalEdges: any[] = [];
+
+    // Preserve existing edges that are still in the new model
+    edges.forEach(edge => {
+      const sourceNode = nodes.find(n => n.id === edge.source);
+      const targetNode = nodes.find(n => n.id === edge.target);
+      if (sourceNode && targetNode) {
+        const sourceElement = currentElementsMap.get(sourceNode.data.label);
+        const targetElement = currentElementsMap.get(targetNode.data.label);
+        if(sourceElement && targetElement){
+          const flowKey = getFlowKey({ source: sourceElement.id, target: targetElement.id });
+          if (newFlowKeys.has(flowKey)) {
+            console.log(`↻ Preserving flow: ${sourceNode.data.label} -> ${targetNode.data.label}`);
+            finalEdges.push(edge);
+          }
+        }
+      }
+    });
+
+    // Add new flows from the AI model
+    newProcess.flows.forEach((newFlow) => {
+        const flowKey = getFlowKey(newFlow);
+        if (!currentFlowKeys.has(flowKey)) {
+            const sourceElement = newProcess.elements.find(e => e.id === newFlow.source);
+            const targetElement = newProcess.elements.find(e => e.id === newFlow.target);
+            if (sourceElement && targetElement) {
+              const sourceNodeId = elementLabelToId.get(sourceElement.label);
+              const targetNodeId = elementLabelToId.get(targetElement.label);
+              if (sourceNodeId && targetNodeId) {
+                console.log(`+ Adding new flow: ${sourceElement.label} -> ${targetElement.label}`);
+                const newEdge = {
+                  id: newFlow.id || `edge-${Date.now()}-${finalEdges.length}`,
+                  type: newFlow.type,
+                  source: sourceNodeId,
+                  target: targetNodeId,
+                  data: {
+                    label: newFlow.label,
+                    condition: newFlow.condition,
+                    isDefault: newFlow.isDefault,
+                    messageType: newFlow.messageType,
+                  },
+                };
+                finalEdges.push(newEdge);
+              }
+            }
+        }
+    });
+
+    return { nodes: finalNodes, edges: finalEdges, affectedElementIds };
+  };
+
   const handleSendMessage = async () => {
-    if ((!inputMessage.trim() && uploadedImages.length === 0) || isLoading) return;
+    if ((!inputMessage.trim() && uploadedImages.length === 0) || isLoading || !currentDiagramId) return;
 
     const userMessage: ChatMessage = {
       role: 'user',
-      content: inputMessage + (uploadedImages.length > 0 ? ` [${uploadedImages.length} image(s) attached]` : ''),
+      content: inputMessage + (uploadedImages.length > 0 ? `[${uploadedImages.length} image(s) attached]` : ''),
       timestamp: new Date(),
     };
-
     setMessages(prev => [...prev, userMessage]);
+
     const currentInput = inputMessage;
     const currentImages = uploadedImages;
     setInputMessage('');
@@ -620,73 +756,33 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
 
     try {
       const currentProcess = getCurrentProcess();
-      console.log('🎯 Sending message to AI directly:', currentInput);
+      console.log('🎯 Sending message to AI via stateful chat:', currentInput);
       console.log('📊 Current process:', currentProcess);
+      console.log('📍 Diagram ID:', currentDiagramId);
       console.log('🖼️ Images attached:', currentImages.length);
-      
-      // For now, use direct AI service without backend persistence
-      // TODO: Implement backend API endpoints for stateful chat
-      const response = await aiService.chatAboutProcess(
-        currentInput,
-        currentProcess,
-        messages // Pass current conversation history
-      );
-      
-      console.log('📦 Response from AI service:', response);
-      console.log('📦 Response type:', response.type);
-      console.log('📦 Response has process?', !!response.process);
 
-      // Handle AI response for in-memory chat (no backend persistence)
+      const imageDataUrls = await Promise.all(currentImages.map(img => convertImageToBase64(img.file)));
+
+      // This is the key change: use the stateful endpoint
+      const response = await aiService.postChatMessage(currentDiagramId, currentInput, currentProcess, imageDataUrls);
       
-      // Check if AI wants to use a tool
-      if (response.type === 'tool_call') {
-        console.log('🔧 Tool call detected:', response.tool_call);
-        const toolCall = response.tool_call;
-        
-        // Show AI's message first if provided
-        if (response.message) {
-          const aiMessage: ChatMessage = {
-            role: 'assistant',
-            content: response.message,
-            timestamp: new Date(),
-          };
-          setMessages(prev => [...prev, aiMessage]);
-        }
+      console.log('📦 Response from stateful chat:', response);
 
-        // Execute the tool
-        await executeTool(toolCall);
-      } else {
-        console.log('📝 Regular message response');
-        
-        // Check if response includes a process modification
-        if (response.process) {
-          console.log('🎨 Process modification detected!');
-          console.log('🎨 Modified process:', response.process);
-          
-          // Apply the modified process to the diagram
-          const currentProcess = getCurrentProcess();
-          console.log('🎨 Applying process changes, isModification:', !!currentProcess);
-          applyProcessChanges(response.process, !!currentProcess);
-          
-          // Add a tool usage indicator to the chat
-          const toolMessage: ChatMessage = {
-            role: 'assistant',
-            content: '🔧 Using tool: modify_existing_process',
-            timestamp: new Date(),
-          };
-          setMessages(prev => [...prev, toolMessage]);
-        }
-
-        // Display AI response
-        if (response.content) {
-          const assistantMessage: ChatMessage = {
-            role: 'assistant',
-            content: response.content,
-            timestamp: new Date(),
-          };
-          setMessages(prev => [...prev, assistantMessage]);
-        }
+      if (response.process) {
+        console.log('🎨 Process modification detected!');
+        const isModification = !!getCurrentProcess();
+        applyProcessChanges(response.process, isModification);
       }
+
+      if (response.content) {
+        const assistantMessage: ChatMessage = {
+          role: 'assistant',
+          content: response.content,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+      }
+
     } catch (error) {
       const errorMessage: ChatMessage = {
         role: 'assistant',
@@ -961,27 +1057,43 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
   };
 
   const handleResetChat = async () => {
-    // Confirm with user before clearing
-    if (!window.confirm('Are you sure you want to clear the chat history? This action cannot be undone.')) {
+    if (!currentDiagramId) {
+      console.warn('No diagram ID available for resetting chat');
+      return;
+    }
+    if (!window.confirm('Are you sure you want to clear all chat history for this diagram? This action cannot be undone.')) {
       return;
     }
 
-    // Simple in-memory reset (no backend for now)
-    setMessages([{ 
-      role: 'assistant', 
-      content: "Hi! I'm Process Modeler AI, your intelligent assistant for this visual BPMN process modeling tool. I can help you create business processes, modify tasks and flows on the canvas, and analyze your process designs. I understand the visual connections between your process elements and will help maintain them as we work together. What process would you like to model today?", 
-      timestamp: new Date() 
-    }]);
-    
-    // Show success message
-    setTimeout(() => {
+    setIsLoading(true);
+    try {
+      const result = await aiService.clearChatHistory(currentDiagramId);
+      console.log(`✅ Chat history cleared: ${result.deletedCount} messages deleted`);
+      setMessages([{
+        role: 'assistant',
+        content: "Hi! I'm Process Modeler AI, your intelligent assistant for this visual BPMN process modeling tool. I can help you create business processes, modify tasks and flows on the canvas, and analyze your process designs. I understand the visual connections between your process elements and will help maintain them as we work together. What process would you like to model today?",
+        timestamp: new Date()
+      }]);
+      // Optional: show a temporary success message
       const successMessage: ChatMessage = {
         role: 'assistant',
-        content: '🗑️ Chat history cleared! Starting fresh conversation.',
+        content: `🗑️ Chat history cleared! Deleted ${result.deletedCount} messages. Starting fresh conversation.`,
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, successMessage]);
-    }, 500);
+      setTimeout(() => {
+        setMessages(prev => [...prev, successMessage]);
+      }, 500);
+    } catch (error) {
+      console.error('❌ Failed to clear chat history:', error);
+      const errorMessage: ChatMessage = {
+        role: 'assistant',
+        content: `Failed to clear chat history: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
