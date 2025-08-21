@@ -46,17 +46,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ onCreateDiagram }) => {
   const loadDiagrams = async () => {
     try {
       setLoading(true);
-      // For now, load diagrams from localStorage instead of API
-      // TODO: Replace with actual API call when backend is ready
-      const storedDiagrams = localStorage.getItem('process_diagrams');
-      if (storedDiagrams) {
-        const data = JSON.parse(storedDiagrams);
-        setDiagrams(data);
-      } else {
-        setDiagrams([]); // No diagrams yet
+      // Load diagrams from cloud database
+      const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+      const response = await fetch(`${API_BASE_URL}/diagrams`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load diagrams: ${response.status}`);
       }
+      
+      const diagrams = await response.json();
+      setDiagrams(diagrams);
+      console.log('📊 Loaded diagrams from cloud database:', diagrams.length);
     } catch (err) {
+      console.error('Failed to load diagrams:', err);
       setError(err instanceof Error ? err.message : 'Failed to load diagrams');
+      setDiagrams([]); // Fallback to empty array
     } finally {
       setLoading(false);
     }
@@ -68,12 +72,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ onCreateDiagram }) => {
     }
 
     try {
-      // Delete from localStorage
+      // Delete from cloud database
+      const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+      const response = await fetch(`${API_BASE_URL}/diagram?id=${diagramId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `Failed to delete diagram: ${response.status}`);
+      }
+
+      // Remove from local state
       const updatedDiagrams = diagrams.filter(d => d.id !== diagramId);
-      localStorage.setItem('process_diagrams', JSON.stringify(updatedDiagrams));
       setDiagrams(updatedDiagrams);
       setMenuOpenId(null);
+      
+      console.log('✅ Diagram deleted successfully');
     } catch (err) {
+      console.error('Failed to delete diagram:', err);
       alert(err instanceof Error ? err.message : 'Failed to delete diagram');
     }
   };
