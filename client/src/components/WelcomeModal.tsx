@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Activity, Users, Download, Upload, GitBranch } from 'lucide-react';
+import { X, Activity, Users, Upload, GitBranch } from 'lucide-react';
 
 export const WelcomeModal: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
