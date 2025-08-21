@@ -2,6 +2,12 @@
 const { createClient } = require('@libsql/client');
 const AIService = require('./_lib/ai-service');
 
+// Debug environment variables in Vercel
+console.log('🔍 Environment check:');
+console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+console.log('TURSO_AUTH_TOKEN exists:', !!process.env.TURSO_AUTH_TOKEN);
+console.log('TURSO_DATABASE_URL exists:', !!process.env.TURSO_DATABASE_URL);
+
 function createDbClient() {
   return createClient({
     url: process.env.DATABASE_URL || process.env.TURSO_DATABASE_URL,
