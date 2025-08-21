@@ -239,25 +239,25 @@ function computeFinalSchemaState(currentSchema, newSchema) {
 }
 
 // Main function that handles all API routes
-// Vercel serverless function handler
-export default async function handler(req, res) {
-  // Enable CORS for browser requests
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+module.exports = async (req, res) => {
+  try {
+    console.log('🚀 Serverless function invoked');
+    console.log('📍 Method:', req.method);
+    console.log('📍 URL:', req.url);
+    
+    // Early error handling for missing environment variables
+    if (!process.env.DATABASE_URL && !process.env.TURSO_DATABASE_URL) {
+      console.error('❌ CRITICAL: No database URL found in environment');
+      return res.status(500).json({ 
+        error: 'Database configuration missing',
+        envCheck: {
+          DATABASE_URL: !!process.env.DATABASE_URL,
+          TURSO_DATABASE_URL: !!process.env.TURSO_DATABASE_URL,
+          TURSO_AUTH_TOKEN: !!process.env.TURSO_AUTH_TOKEN
+        }
+      });
+    }
   
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
-  return handleRequest(req, res);
-}
-
-// Also export for CommonJS compatibility (local development)
-module.exports = handler;
-
-async function handleRequest(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -1280,6 +1280,14 @@ async function handleRequest(req, res) {
     return res.status(500).json({ 
       error: 'Internal server error',
       details: error.message 
+    });
+  }
+  } catch (topLevelError) {
+    console.error('❌ Top-level error in serverless function:', topLevelError);
+    return res.status(500).json({ 
+      error: 'Critical server error',
+      message: topLevelError.message,
+      stack: topLevelError.stack
     });
   }
 }
