@@ -9,6 +9,8 @@ class AIService {
     
     console.log('🔧 AIService constructor');
     console.log('🔑 API Key exists:', !!this.apiKey);
+    console.log('🔑 API Key value:', this.apiKey ? `"${this.apiKey}"` : 'undefined');
+    console.log('🔑 API Key length:', this.apiKey ? this.apiKey.length : 0);
     console.log('🌐 Base URL:', this.baseURL);
     console.log('🤖 Default model:', this.defaultModel);
     
@@ -23,6 +25,32 @@ class AIService {
       console.error('❌ API Key:', !!this.apiKey);
       console.error('❌ Base URL:', this.baseURL);
     }
+    
+    // Validate API key format
+    if (this.apiKey) {
+      // Check for invalid characters that might cause header issues
+      const invalidChars = /[\r\n\t\0]/;
+      if (invalidChars.test(this.apiKey)) {
+        console.error('❌ API Key contains invalid characters (newlines, tabs, etc.)');
+        console.error('❌ API Key bytes:', Array.from(this.apiKey).map(c => c.charCodeAt(0)));
+      }
+    }
+  }
+
+  // Get safe authorization header
+  getAuthHeader() {
+    if (!this.apiKey || this.apiKey === 'placeholder') {
+      throw new Error('No valid API key configured. Please set OPENROUTER_API_KEY environment variable.');
+    }
+    
+    // Clean the API key of any invalid characters
+    const cleanApiKey = this.apiKey.trim().replace(/[\r\n\t\0]/g, '');
+    
+    if (cleanApiKey !== this.apiKey) {
+      console.warn('⚠️ API key contained invalid characters, cleaned');
+    }
+    
+    return `Bearer ${cleanApiKey}`;
   }
 
   // Get reasoning configuration for API calls
@@ -183,7 +211,7 @@ Respond ONLY with valid JSON matching the required BPMN process format. Do not i
         ...this.getReasoningConfig()
       }, {
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': this.getAuthHeader(),
           'Content-Type': 'application/json',
           'HTTP-Referer': 'http://localhost:3000',
           'X-Title': 'Process Pipeline Creator'
@@ -359,7 +387,7 @@ ${currentProcess ? JSON.stringify(currentProcess, null, 2) : 'No process is on t
           ...this.getReasoningConfig()
         }, {
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            'Authorization': this.getAuthHeader(),
             'Content-Type': 'application/json',
             'HTTP-Referer': 'http://localhost:3000',
             'X-Title': 'Database Diagram Tool'
@@ -410,7 +438,7 @@ Intent:`;
           ...this.getReasoningConfig()
         }, {
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            'Authorization': this.getAuthHeader(),
             'Content-Type': 'application/json',
             'HTTP-Referer': 'http://localhost:3000',
             'X-Title': 'Database Diagram Tool'
@@ -464,7 +492,7 @@ Intent:`;
             ...this.getReasoningConfig()
           }, {
             headers: {
-              'Authorization': `Bearer ${this.apiKey}`,
+              'Authorization': this.getAuthHeader(),
               'Content-Type': 'application/json',
               'HTTP-Referer': 'http://localhost:3000',
               'X-Title': 'Database Diagram Tool'
@@ -542,7 +570,7 @@ Intent:`;
         ...this.getReasoningConfig()
       }, {
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': this.getAuthHeader(),
           'Content-Type': 'application/json',
           'HTTP-Referer': 'http://localhost:3000',
           'X-Title': 'Database Diagram Tool'
@@ -596,7 +624,7 @@ Intent:`;
           ...this.getReasoningConfig()
         }, {
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            'Authorization': this.getAuthHeader(),
             'Content-Type': 'application/json',
             'HTTP-Referer': 'http://localhost:3000',
             'X-Title': 'Database Diagram Tool'
@@ -647,7 +675,7 @@ Format your response in clear markdown with proper headers and bullet points.`;
         ...this.getReasoningConfig()
       }, {
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': this.getAuthHeader(),
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://signavio-clone.local',
           'X-Title': 'BPMN Process Modeling Tool'
@@ -681,7 +709,7 @@ Format your response in clear markdown with proper headers and bullet points.`;
           max_tokens: 150,
         }, {
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            'Authorization': this.getAuthHeader(),
             'Content-Type': 'application/json',
             'HTTP-Referer': 'https://signavio.vercel.app',
             'X-Title': 'BPMN Process Modeling Tool'
@@ -741,7 +769,7 @@ Respond with plain text analysis, not as a tool call.`;
 
       const response = await axios.post(`${this.baseURL}/chat/completions`, requestBody, {
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': this.getAuthHeader(),
           'Content-Type': 'application/json',
         },
       });
