@@ -1086,7 +1086,7 @@ module.exports = async (req, res) => {
     if (method === 'POST' && url.includes('/diagram-chat')) {
       const urlParams = new URLSearchParams(url.split('?')[1] || '');
       const diagramId = urlParams.get('id');
-      const { message, currentProcess, currentSchema, images } = body;
+      const { message, currentProcess, images } = body;
       
       if (!diagramId) {
         return res.status(400).json({ error: 'Diagram ID is required as query parameter' });
@@ -1188,40 +1188,7 @@ module.exports = async (req, res) => {
             responseContent = `I've modified your process. Changes: ${args.description}`;
             finalResponse = { process: finalProcess, content: responseContent };
           }
-          // Legacy schema tool calls (for backward compatibility)
-          else if (toolCall.function.name === 'analyze_current_schema') {
-            console.log('🔍 Executing schema analysis (legacy)');
-            const analysis = await aiService.analyzeSchema(currentSchema);
-            console.log('📊 Analysis result length:', analysis?.length || 0);
-            responseContent = analysis;
-            finalResponse = { content: analysis };
-          } else if (toolCall.function.name === 'generate_database_schema') {
-            console.log('🏗️ Executing schema generation (legacy)');
-            const args = JSON.parse(toolCall.function.arguments);
-            console.log('⚙️ Generation args:', args);
-            const schema = await aiService.generateSchema(args.description);
-            console.log('✅ Generated schema tables count:', schema?.tables?.length || 0);
-            // Include more context about what was created
-            const tableNames = schema?.tables?.map(t => t.name).join(', ') || '';
-            responseContent = `I've successfully analyzed your image and generated a database schema based on what I saw. The schema includes ${schema?.tables?.length || 0} tables: ${tableNames}. This was created from the image you provided showing ${args.description}.`;
-            finalResponse = { schema, content: responseContent };
-          } else if (toolCall.function.name === 'modify_existing_schema') {
-            console.log('🔄 Executing schema modification (legacy)');
-            const args = JSON.parse(toolCall.function.arguments);
-            console.log('⚙️ Modification args:', args);
-            
-            // Generate the AI's proposed schema
-            const aiGeneratedSchema = await aiService.generateSchema(`${args.modification_type}: ${args.description}`, currentSchema);
-            console.log('🤖 AI generated schema tables count:', aiGeneratedSchema?.tables?.length || 0);
-            
-            // Use non-destructive merging to preserve existing relationships and IDs
-            const finalSchema = computeFinalSchemaState(currentSchema, aiGeneratedSchema);
-            console.log('✅ Final merged schema tables count:', finalSchema?.tables?.length || 0);
-            console.log('✅ Final merged schema relationships count:', finalSchema?.relationships?.length || 0);
-            
-            responseContent = `I've modified your schema. Changes: ${args.description}`;
-            finalResponse = { schema: finalSchema, content: responseContent };
-          } else {
+          else {
             // Unknown tool call
             responseContent = `Tool execution not implemented: ${toolCall.function.name}`;
             finalResponse = { content: responseContent };
