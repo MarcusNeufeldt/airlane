@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { EdgeProps, getBezierPath, EdgeLabelRenderer } from 'reactflow';
+import { EdgeProps, EdgeLabelRenderer, Position } from 'reactflow';
 import { useDiagramStore } from '../stores/diagramStore';
 import { X } from 'lucide-react';
 
@@ -16,7 +16,7 @@ export const SequenceFlowEdge: React.FC<EdgeProps> = ({
   data,
   selected,
 }) => {
-  const { updateEdge, removeEdge, simulationActiveEdges, isSimulating } = useDiagramStore();
+  const { updateEdge, removeEdge, simulationActiveEdges, isSimulating, gridSize, snapToGrid } = useDiagramStore();
   const [isEditing, setIsEditing] = useState(false);
   const [condition, setCondition] = useState(data?.condition || '');
 
@@ -42,14 +42,105 @@ export const SequenceFlowEdge: React.FC<EdgeProps> = ({
   const handleDeleteClick = () => {
     removeEdge(id);
   };
-  const [edgePath, labelX, labelY] = getBezierPath({
+
+  // Custom Manhattan routing function for grid-based connections
+  const getManhattanPath = (
+    sourceX: number,
+    sourceY: number,
+    sourcePosition: Position,
+    targetX: number,
+    targetY: number,
+    targetPosition: Position,
+    gridSize: number = 20
+  ) => {
+    // Snap coordinates to grid
+    const snapToGrid = (value: number) => Math.round(value / gridSize) * gridSize;
+    
+    // Calculate connection points based on node positions
+    const getConnectionPoint = (x: number, y: number, position: Position, offset: number = 50) => {
+      switch (position) {
+        case Position.Right:
+          return { x: x + offset, y: y };
+        case Position.Left:
+          return { x: x - offset, y: y };
+        case Position.Top:
+          return { x: x, y: y - offset };
+        case Position.Bottom:
+          return { x: x, y: y + offset };
+        default:
+          return { x: x + offset, y: y };
+      }
+    };
+
+    const source = getConnectionPoint(sourceX, sourceY, sourcePosition);
+    const target = getConnectionPoint(targetX, targetY, targetPosition);
+
+    // Snap to grid
+    const startX = snapToGrid(source.x);
+    const startY = snapToGrid(source.y);
+    const endX = snapToGrid(target.x);
+    const endY = snapToGrid(target.y);
+
+    // Calculate waypoints for Manhattan routing
+    const waypoints: Array<{x: number, y: number}> = [
+      { x: startX, y: startY }
+    ];
+
+    // Add intermediate waypoints for orthogonal routing
+    const midY = startY + (endY - startY) / 2;
+
+    // Improved Manhattan routing logic
+    const horizontalDistance = Math.abs(endX - startX);
+    const verticalDistance = Math.abs(endY - startY);
+    
+    // Always add intermediate points for cleaner routing
+    if (horizontalDistance > gridSize && verticalDistance > gridSize) {
+      // Both horizontal and vertical movement needed
+      if (sourcePosition === Position.Right || sourcePosition === Position.Left) {
+        // Start horizontally from source
+        const intermediateX = startX + (endX - startX) * 0.6;
+        waypoints.push({ x: snapToGrid(intermediateX), y: startY });
+        waypoints.push({ x: snapToGrid(intermediateX), y: endY });
+      } else {
+        // Start vertically from source
+        const intermediateY = startY + (endY - startY) * 0.6;
+        waypoints.push({ x: startX, y: snapToGrid(intermediateY) });
+        waypoints.push({ x: endX, y: snapToGrid(intermediateY) });
+      }
+    } else if (horizontalDistance > gridSize) {
+      // Only horizontal movement
+      waypoints.push({ x: endX, y: startY });
+    } else if (verticalDistance > gridSize) {
+      // Only vertical movement
+      waypoints.push({ x: startX, y: endY });
+    }
+
+    waypoints.push({ x: endX, y: endY });
+
+    // Create SVG path from waypoints
+    const pathData = waypoints.reduce((path, point, index) => {
+      return path + (index === 0 ? `M ${point.x} ${point.y}` : ` L ${point.x} ${point.y}`);
+    }, '');
+
+    // Calculate label position (center of path)
+    const labelX = (startX + endX) / 2;
+    const labelY = (startY + endY) / 2;
+
+    return [pathData, labelX, labelY] as const;
+  };
+
+  const [edgePath, labelX, labelY] = getManhattanPath(
     sourceX,
     sourceY,
     sourcePosition,
     targetX,
     targetY,
     targetPosition,
-  });
+    snapToGrid ? gridSize : 20 // Use actual grid size when snap-to-grid is enabled
+  );
+
+  // Ensure edgePath is a string for the SVG d attribute
+  const pathString = String(edgePath);
 
   return (
     <>
@@ -67,7 +158,7 @@ export const SequenceFlowEdge: React.FC<EdgeProps> = ({
         className={`react-flow__edge-path hover:stroke-blue-500 transition-all duration-300 ${
           simulationActiveEdges.includes(id) && isSimulating ? 'animate-pulse' : ''
         }`}
-        d={edgePath}
+        d={pathString}
         markerEnd={markerEnd}
       />
       

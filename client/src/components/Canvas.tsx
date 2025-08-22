@@ -573,7 +573,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
         edgeTypes={edgeTypes}
         defaultEdgeOptions={{ type: 'sequence-flow', markerEnd: { type: MarkerType.ArrowClosed } }}
         connectionMode={ConnectionMode.Loose}
-        connectionLineType={ConnectionLineType.SmoothStep}
+        connectionLineType={ConnectionLineType.Step}
         connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2 }}
         snapToGrid={snapToGrid}
         snapGrid={[gridSize, gridSize]}
