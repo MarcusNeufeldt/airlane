@@ -389,16 +389,16 @@ ${currentProcess ? JSON.stringify(currentProcess, null, 2) : 'No process is on t
         console.log('Function calling failed, falling back to text analysis:', functionCallError.response?.data?.error?.message);
         
         // Fallback: Use text-based intent detection
-        const intentPrompt = `You are Data Modeler AI, an assistant embedded in a visual database diagramming tool. Analyze this user message and determine their intent:
+        const intentPrompt = `You are Process Modeler AI, an assistant embedded in a visual BPMN process diagramming tool. Analyze this user message and determine their intent:
 
 User message: "${userMessage}"
 
-Current schema exists: ${currentSchema ? 'Yes' : 'No'}
+Current process exists: ${currentProcess ? 'Yes' : 'No'}
 
 Respond with ONLY ONE of these exact phrases:
-- "GENERATE_SCHEMA" - if they want to create a new schema
-- "MODIFY_SCHEMA" - if they want to change the existing schema  
-- "ANALYZE_SCHEMA" - if they want analysis only
+- "GENERATE_PROCESS" - if they want to create a new process
+- "MODIFY_PROCESS" - if they want to change the existing process  
+- "ANALYZE_PROCESS" - if they want analysis only
 - "CHAT" - if it's a general question
 
 Intent:`;
