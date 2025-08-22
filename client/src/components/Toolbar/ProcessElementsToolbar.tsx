@@ -21,12 +21,8 @@ export const ProcessElementsToolbar: React.FC = () => {
     addNode('gateway', { x: 400, y: 200 });
   };
 
-  const handleAddLane = () => {
-    addNode('lane', { x: 400, y: 200 });
-  };
-
   const handleAddPool = () => {
-    addNode('pool', { x: 400, y: 200 });
+    addNode('pool-with-lanes', { x: 400, y: 200 });
   };
 
   const handleAddDataObject = () => {
@@ -77,19 +73,10 @@ export const ProcessElementsToolbar: React.FC = () => {
       {/* Organization Elements - Grouped */}
       <div className="flex items-center space-x-1 bg-gray-50 rounded-lg px-2 py-1">
         <button
-          onClick={handleAddLane}
-          disabled={isReadOnly}
-          className="p-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Add Lane (Process Organizer)"
-        >
-          <Users size={18} />
-        </button>
-
-        <button
           onClick={handleAddPool}
           disabled={isReadOnly}
           className="p-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Add Pool (Participant Container)"
+          title="Add Pool/Lanes (Participant Container)"
         >
           <Building2 size={18} />
         </button>

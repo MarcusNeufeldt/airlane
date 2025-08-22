@@ -165,14 +165,30 @@ export class BPMNService {
     console.log(`Extracted ${shapePositions.size} positions from diagram`);
 
     // Extract lane and pool information
-    const lanes = new Map<string, { name: string, color: string }>();
-    const pools = new Map<string, { name: string, color: string }>();
+    const lanes = new Map<string, { name: string, color: string, poolId?: string }>();
+    const pools = new Map<string, { name: string, color: string, lanes: string[] }>();
     const elementLaneMap = new Map<string, string>(); // elementId -> laneId
     
     // Look for lanes in all processes (handle multiple processes)
     const allProcesses = xmlDoc.querySelectorAll('process');
     
+    // First, find which process belongs to which pool
+    const processToPoolMap = new Map<string, string>();
+    if (collaboration) {
+      const participants = collaboration.querySelectorAll('participant');
+      participants.forEach(participant => {
+        const poolId = participant.getAttribute('id');
+        const processRef = participant.getAttribute('processRef');
+        if (poolId && processRef) {
+          processToPoolMap.set(processRef, poolId);
+        }
+      });
+    }
+    
     allProcesses.forEach(proc => {
+      const processId = proc.getAttribute('id');
+      const poolId = processId ? processToPoolMap.get(processId) : null;
+      
       const laneElements = proc.querySelectorAll('lane');
       console.log(`🔍 Found ${laneElements.length} lane elements in process ${proc.id || 'unnamed'}`);
       
@@ -180,8 +196,14 @@ export class BPMNService {
         const laneId = lane.getAttribute('id') || `lane_${index}`;
         const laneName = (lane.getAttribute('name') || `Lane ${index + 1}`).replace(/&#10;/g, '\n');
         const color = generateLaneColor(index);
-        lanes.set(laneId, { name: laneName, color });
-        console.log(`🏊 Lane ${index}: ${laneId} (${laneName}) - color: ${color}`);
+        lanes.set(laneId, { name: laneName, color, poolId: poolId || undefined });
+        
+        // Track which lanes belong to which pool
+        if (poolId && poolToLanesMap.has(poolId)) {
+          poolToLanesMap.get(poolId)?.push(laneId);
+        }
+        
+        console.log(`🏊 Lane ${index}: ${laneId} (${laneName}) - color: ${color}, pool: ${poolId || 'none'}`);
         
         // Map flow nodes to this lane
         const flowNodeRefs = lane.querySelectorAll('flowNodeRef');
@@ -199,85 +221,75 @@ export class BPMNService {
     
     // Look for pools (participants) in collaboration
     const collaboration = xmlDoc.querySelector('collaboration');
+    const poolToLanesMap = new Map<string, string[]>();
+    
     if (collaboration) {
       const participants = collaboration.querySelectorAll('participant');
       participants.forEach((participant, index) => {
         const poolId = participant.getAttribute('id') || `pool_${index}`;
         const poolName = (participant.getAttribute('name') || `Pool ${index + 1}`).replace(/&#10;/g, '\n');
         const color = generatePoolColor(index);
-        pools.set(poolId, { name: poolName, color });
-
-        // CHANGE 4: Create pool node with proper dimensions and z-index
-        const positionData = shapePositions.get(poolId) || { x: 50, y: 50, width: 1200, height: 800 };
-        nodes.push({
-          id: poolId,
-          type: 'pool',
-          position: { x: positionData.x, y: positionData.y },
-          data: {
-            id: poolId,
-            label: poolName,
-            participant: poolName,
-            width: positionData.width,
-            height: positionData.height
-          },
-          // CHANGE 4: Set zIndex to ensure it's in the background
-          zIndex: -20,
-        });
+        pools.set(poolId, { name: poolName, color, lanes: [] });
+        poolToLanesMap.set(poolId, []);
       });
     }
     
-    // =================================================================
-    // == START OF FIX: Create Lane nodes with parent-child relationships
-    // =================================================================
-    let participantId: string | null = null;
-    if (collaboration) {
-      const participant = collaboration.querySelector('participant');
-      participantId = participant?.getAttribute('id') || null;
-    }
-
-    allProcesses.forEach(proc => {
-      const laneElements = proc.querySelectorAll('lane');
-      laneElements.forEach((lane) => {
-        const laneId = lane.getAttribute('id') || '';
-        const laneName = (lane.getAttribute('name') || 'Lane').replace(/&#10;/g, '\n');
-        const positionData = shapePositions.get(laneId);
-
-        if (positionData) {
-          console.log(`✅ Creating LaneNode for ${laneId} (${laneName}) with parent: ${participantId}`);
-          const laneInfo = lanes.get(laneId);
-          
-          const laneNode: any = {
-            id: laneId,
-            type: 'lane',
-            position: { x: positionData.x, y: positionData.y },
-            data: {
-              id: laneId,
-              label: laneName,
-              nodeType: 'lane',
-              width: positionData.width,
-              height: positionData.height,
-              backgroundColor: laneInfo?.color,
-              assignee: laneName,
-            },
-            // Lanes should be behind tasks but in front of pools
-            zIndex: -10,
-          };
-          
-          // CHANGE: Assign lane to its parent pool if available
-          if (participantId) {
-            laneNode.parentNode = participantId;
-            laneNode.extent = 'parent';
-          }
-          
-          nodes.push(laneNode);
-        } else {
-          console.warn(`⚠️ Could not find position data for lane ${laneId}`);
-        }
+    // Create unified pool-with-lanes nodes
+    poolToLanesMap.forEach((laneIds, poolId) => {
+      const poolInfo = pools.get(poolId);
+      const positionData = shapePositions.get(poolId) || { x: 50, y: 50, width: 600, height: 400 };
+      
+      // Collect lane information
+      const poolLanes = laneIds.map((laneId, index) => {
+        const laneInfo = lanes.get(laneId);
+        const lanePosition = shapePositions.get(laneId);
+        return {
+          id: laneId,
+          name: laneInfo?.name || `Lane ${index + 1}`,
+          height: lanePosition?.height || 120,
+          color: laneInfo?.color || generateLaneColor(index)
+        };
+      });
+      
+      // Create the unified pool-with-lanes node
+      nodes.push({
+        id: poolId,
+        type: 'pool-with-lanes',
+        position: { x: positionData.x, y: positionData.y },
+        data: {
+          id: poolId,
+          label: poolInfo?.name || 'Pool',
+          participant: poolInfo?.name || 'Pool',
+          lanes: poolLanes,
+          width: positionData.width,
+          height: positionData.height,
+          nodeType: 'pool-with-lanes' as const
+        },
+        zIndex: -20,
       });
     });
-    // =================================================================
-    // == END OF FIX
-    // =================================================================
+    
+    // For pools without lanes, create simple pool nodes
+    pools.forEach((poolInfo, poolId) => {
+      if (!poolToLanesMap.has(poolId) || poolToLanesMap.get(poolId)?.length === 0) {
+        const positionData = shapePositions.get(poolId) || { x: 50, y: 50, width: 600, height: 400 };
+        nodes.push({
+          id: poolId,
+          type: 'pool-with-lanes',
+          position: { x: positionData.x, y: positionData.y },
+          data: {
+            id: poolId,
+            label: poolInfo.name,
+            participant: poolInfo.name,
+            lanes: [],
+            width: positionData.width,
+            height: positionData.height,
+            nodeType: 'pool-with-lanes' as const
+          },
+          zIndex: -20,
+        });
+      }
+    });
     
     console.log(`Found ${lanes.size} lanes and ${pools.size} pools`);
     console.log('Lane assignments:', Array.from(elementLaneMap.entries()));
@@ -303,9 +315,10 @@ export class BPMNService {
       // Check if element is assigned to a lane
       const assignedLaneId = elementLaneMap.get(id);
       const laneInfo = assignedLaneId ? lanes.get(assignedLaneId) : null;
+      const poolId = laneInfo?.poolId;
       
       if (assignedLaneId) {
-        console.log(`🎯 Element ${id} assigned to lane ${assignedLaneId} (${laneInfo?.name}) - color: ${laneInfo?.color}`);
+        console.log(`🎯 Element ${id} assigned to lane ${assignedLaneId} (${laneInfo?.name}) in pool ${poolId || 'none'}`);
       } else {
         console.log(`❌ Element ${id} not assigned to any lane`);
       }
@@ -360,11 +373,11 @@ export class BPMNService {
           zIndex: 0,
         };
         
-        // CHANGE: Assign element to its lane as a parent
-        if (assignedLaneId) {
-          elementNode.parentNode = assignedLaneId;
-          elementNode.extent = 'parent'; // Constrain element within its lane
-          console.log(`🔗 Element ${id} assigned to parent lane ${assignedLaneId}`);
+        // Assign element to its pool if it has a lane
+        if (poolId) {
+          elementNode.parentNode = poolId;
+          elementNode.extent = 'parent'; // Constrain element within its pool
+          console.log(`🔗 Element ${id} assigned to parent pool ${poolId} via lane ${assignedLaneId}`);
         }
         
         nodes.push(elementNode);

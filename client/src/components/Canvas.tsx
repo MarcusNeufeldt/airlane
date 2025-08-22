@@ -21,6 +21,7 @@ import { EventNode } from './EventNode';
 import { GatewayNode } from './GatewayNode';
 import { LaneNode } from './LaneNode';
 import { PoolNode } from './PoolNode';
+import { PoolWithLanesNode } from './PoolWithLanesNode';
 import { DataObjectNode } from './DataObjectNode';
 import { SequenceFlowEdge } from './SequenceFlowEdge';
 import { MessageFlowEdge } from './MessageFlowEdge';
@@ -37,6 +38,7 @@ const nodeTypes: NodeTypes = {
   gateway: GatewayNode,
   lane: LaneNode,
   pool: PoolNode,
+  'pool-with-lanes': PoolWithLanesNode,
   'data-object': DataObjectNode,
   'sticky-note': StickyNote,
   shape: Shape,
@@ -306,17 +308,10 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
           return;
         }
 
-        // Press 'l' to add Lane
-        if (event.key === 'l' && !isCtrlOrCmd) {
-          event.preventDefault();
-          addNode('lane', { x: 400, y: 200 });
-          return;
-        }
-
-        // Press 'p' to add Pool
+        // Press 'p' to add Pool with Lanes
         if (event.key === 'p' && !isCtrlOrCmd) {
           event.preventDefault();
-          addNode('pool', { x: 400, y: 200 });
+          addNode('pool-with-lanes', { x: 400, y: 200 });
           return;
         }
 

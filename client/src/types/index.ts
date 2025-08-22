@@ -1,4 +1,4 @@
-export type NodeType = 'process' | 'event' | 'gateway' | 'lane' | 'pool' | 'data-object';
+export type NodeType = 'process' | 'event' | 'gateway' | 'lane' | 'pool' | 'pool-with-lanes' | 'data-object';
 export type EventType = 'start' | 'intermediate' | 'end';
 export type ProcessType = 'task' | 'subprocess';
 export type TaskType = 'user' | 'service' | 'manual' | 'script' | 'business-rule' | 'send' | 'receive';
@@ -55,6 +55,19 @@ export interface PoolNodeData extends BaseNodeData {
   height: number;
 }
 
+export interface PoolWithLanesData extends BaseNodeData {
+  nodeType: 'pool-with-lanes';
+  participant: string;
+  lanes: Array<{
+    id: string;
+    name: string;
+    height: number;
+    color: string;
+  }>;
+  width: number;
+  height: number;
+}
+
 export interface DataObjectNodeData extends BaseNodeData {
   nodeType: 'data-object';
   dataType: DataObjectType;
@@ -62,7 +75,7 @@ export interface DataObjectNodeData extends BaseNodeData {
 }
 
 // A union type for any possible node data
-export type DiagramNodeData = EventNodeData | ProcessNodeData | GatewayNodeData | LaneNodeData | PoolNodeData | DataObjectNodeData | StickyNoteData | ShapeData;
+export type DiagramNodeData = EventNodeData | ProcessNodeData | GatewayNodeData | LaneNodeData | PoolNodeData | PoolWithLanesData | DataObjectNodeData | StickyNoteData | ShapeData;
 
 // Data for edges (connectors)
 export interface SequenceFlowData {

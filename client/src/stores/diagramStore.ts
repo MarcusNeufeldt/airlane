@@ -19,6 +19,7 @@ import {
   GatewayNodeData,
   LaneNodeData,
   PoolNodeData,
+  PoolWithLanesData,
   DataObjectNodeData,
 } from '../types';
 import * as Y from 'yjs';
@@ -334,6 +335,18 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
             isCollapsed: false
           };
           newNode = { id, type, position: snappedPosition, data: poolData, zIndex: -20 };
+          break;
+        case 'pool-with-lanes':
+          const poolWithLanesData: PoolWithLanesData = { 
+            id, 
+            nodeType: 'pool-with-lanes', 
+            label: 'Process Pool',
+            participant: 'Participant',
+            lanes: [],
+            width: 600,
+            height: 400
+          };
+          newNode = { id, type, position: snappedPosition, data: poolWithLanesData, zIndex: -20 };
           break;
         case 'data-object':
           const dataObjectData: DataObjectNodeData = { 
