@@ -169,6 +169,10 @@ export class BPMNService {
     const pools = new Map<string, { name: string, color: string, lanes: string[] }>();
     const elementLaneMap = new Map<string, string>(); // elementId -> laneId
     
+    // Look for collaboration and pools first
+    const collaboration = xmlDoc.querySelector('collaboration');
+    const poolToLanesMap = new Map<string, string[]>();
+    
     // Look for lanes in all processes (handle multiple processes)
     const allProcesses = xmlDoc.querySelectorAll('process');
     
@@ -219,10 +223,7 @@ export class BPMNService {
       });
     });
     
-    // Look for pools (participants) in collaboration
-    const collaboration = xmlDoc.querySelector('collaboration');
-    const poolToLanesMap = new Map<string, string[]>();
-    
+    // Process pools (participants) in collaboration
     if (collaboration) {
       const participants = collaboration.querySelectorAll('participant');
       participants.forEach((participant, index) => {

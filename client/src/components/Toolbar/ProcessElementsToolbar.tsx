@@ -1,5 +1,5 @@
 import React from 'react';
-import { PlayCircle, StopCircle, Activity, GitBranch, Users, Building2, Database } from 'lucide-react';
+import { PlayCircle, StopCircle, Activity, GitBranch, Building2, Database } from 'lucide-react';
 import { useDiagramStore } from '../../stores/diagramStore';
 
 export const ProcessElementsToolbar: React.FC = () => {

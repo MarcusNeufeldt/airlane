@@ -223,7 +223,6 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
                     onMouseDown={(e) => {
                       e.preventDefault();
                       const startY = e.clientY;
-                      const startHeight = lane.height;
                       
                       const handleMouseMove = (e: MouseEvent) => {
                         const deltaY = e.clientY - startY;
