@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles, RefreshCw, RotateCcw, Paperclip, X } from 'lucide-react';
-import { aiService, ChatMessage, ProcessModel } from '../services/aiService';
+import { aiService, ChatMessage, ProcessModel, ProcessElement, ProcessFlow } from '../services/aiService';
 import { useDiagramStore } from '../stores/diagramStore';
 
 interface AIChatPanelProps {
@@ -23,7 +23,8 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
     flashTable,
     isReadOnly,
     currentDiagramId,
-    addStickyNote
+    addStickyNote,
+    autoLayout
   } = useDiagramStore();
 
   const scrollToBottom = () => {
@@ -136,24 +137,123 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
     return { elements, flows };
   };
 
+  // Calculate optimal positions for elements based on process flow
+  const calculateElementOrder = (elements: ProcessElement[], flows: ProcessFlow[]): string[] => {
+    // Build adjacency list for process flow
+    const graph = new Map<string, string[]>();
+    elements.forEach(e => graph.set(e.id, []));
+    
+    flows.forEach(flow => {
+      const connections = graph.get(flow.source) || [];
+      connections.push(flow.target);
+      graph.set(flow.source, connections);
+    });
+
+    // Find start events
+    const startEvents = elements.filter(e => e.type === 'event' && e.properties?.eventType === 'start');
+    const visited = new Set<string>();
+    const order: string[] = [];
+
+    // BFS traversal from start events
+    let currentLevel = startEvents.map(e => e.id);
+    
+    while (currentLevel.length > 0) {
+      const nextLevel: string[] = [];
+      
+      for (const elementId of currentLevel) {
+        if (!visited.has(elementId)) {
+          visited.add(elementId);
+          order.push(elementId);
+          
+          // Add connected elements to next level
+          const connections = graph.get(elementId) || [];
+          nextLevel.push(...connections);
+        }
+      }
+      
+      currentLevel = [...new Set(nextLevel)];
+    }
+
+    // Add any unvisited elements (isolated nodes)
+    elements.forEach(e => {
+      if (!visited.has(e.id)) {
+        order.push(e.id);
+      }
+    });
+    
+    return order;
+  };
+
+  const calculateOptimalPositions = (elements: ProcessElement[], order: string[]): Map<string, {x: number, y: number}> => {
+    const positions = new Map();
+    const COLUMN_WIDTH = 200;
+    const ROW_HEIGHT = 150;
+    const START_X = 100;
+    const START_Y = 100;
+    
+    // Group elements by columns (process stages)
+    const columns: string[][] = [];
+    let currentColumn: string[] = [];
+    
+    order.forEach((elementId) => {
+      currentColumn.push(elementId);
+      
+      // New column every 3 elements or at gateways
+      const element = elements.find(e => e.id === elementId);
+      if (currentColumn.length >= 3 || element?.type === 'gateway') {
+        columns.push([...currentColumn]);
+        currentColumn = [];
+      }
+    });
+    
+    // Add remaining elements to final column
+    if (currentColumn.length > 0) {
+      columns.push(currentColumn);
+    }
+    
+    // Position elements in columns with proper spacing
+    columns.forEach((column, colIndex) => {
+      column.forEach((elementId, rowIndex) => {
+        positions.set(elementId, {
+          x: START_X + (colIndex * COLUMN_WIDTH),
+          y: START_Y + (rowIndex * ROW_HEIGHT)
+        });
+      });
+    });
+    
+    return positions;
+  };
+
   // Apply process changes to the canvas
   const applyProcessChanges = (processModel: ProcessModel, isModification: boolean = false) => {
     console.log('🔄 applyProcessChanges called:', { isModification, nodeCount: nodes.length, processModel });
 
     if (!isModification || nodes.length === 0) {
-      // Full replacement mode
-      const newNodes = processModel.elements.map((element) => ({
-        id: element.id,
-        type: element.type as any,
-        position: element.position,
-        data: {
+      // Full replacement mode with smart positioning
+      console.log('🧠 Calculating optimal positions for process elements...');
+      
+      // Calculate optimal positions using flow-based algorithm
+      const elementOrder = calculateElementOrder(processModel.elements, processModel.flows);
+      const optimalPositions = calculateOptimalPositions(processModel.elements, elementOrder);
+      
+      console.log('📍 Element order:', elementOrder);
+      console.log('📍 Optimal positions calculated for', optimalPositions.size, 'elements');
+      
+      const newNodes = processModel.elements.map((element) => {
+        const optimalPos = optimalPositions.get(element.id) || element.position;
+        return {
           id: element.id,
-          nodeType: element.type,
-          label: element.label,
-          description: element.description,
-          ...element.properties
-        },
-      }));
+          type: element.type as any,
+          position: optimalPos,
+          data: {
+            id: element.id,
+            nodeType: element.type,
+            label: element.label,
+            description: element.description,
+            ...element.properties
+          },
+        };
+      });
       
       const newEdges = processModel.flows.map(flow => ({
         id: flow.id,
@@ -170,9 +270,19 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
       
       console.log('🔄 Applying full process replacement to canvas:', { nodes: newNodes.length, edges: newEdges.length });
       importDiagram({ nodes: newNodes, edges: newEdges });
-      newNodes.forEach(node => {
-        flashTable(node.id);
-      });
+      
+      // Optional: Apply additional auto-layout refinement for complex processes
+      if (newNodes.length > 5) {
+        console.log('🎯 Applying additional auto-layout refinement for complex process');
+        setTimeout(() => {
+          autoLayout();
+        }, 500);
+      } else {
+        // For simpler processes, just flash the elements
+        newNodes.forEach(node => {
+          flashTable(node.id);
+        });
+      }
       return;
     }
 
@@ -223,13 +333,34 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
       return node;
     });
 
-    // Add new elements that don't exist in current process
-    newProcess.elements.forEach((newElement) => {
-      if (!elementLabelToId.has(newElement.label)) {
+    // Add new elements that don't exist in current process with smart positioning
+    const newElements = newProcess.elements.filter(newElement => !elementLabelToId.has(newElement.label));
+    
+    if (newElements.length > 0) {
+      console.log('🧠 Calculating smart positions for', newElements.length, 'new elements');
+      
+      // Find the rightmost existing element to continue the flow
+      const existingPositions = finalNodes.map(n => n.position.x);
+      const maxX = existingPositions.length > 0 ? Math.max(...existingPositions) : 0;
+      const startX = maxX + 200; // Start new elements 200px to the right
+      
+      // Apply smart positioning for new elements
+      newElements.forEach((newElement, index) => {
+        // Calculate position based on element type and flow
+        let position = newElement.position;
+        
+        // Use smarter positioning for new elements
+        if (!position || (position.x === 0 && position.y === 0)) {
+          position = {
+            x: startX + (Math.floor(index / 3) * 200),
+            y: 100 + ((index % 3) * 150)
+          };
+        }
+        
         const newNode = {
           id: newElement.id || `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           type: newElement.type as any,
-          position: newElement.position,
+          position: position,
           data: {
             id: newElement.id,
             nodeType: newElement.type,
@@ -241,8 +372,8 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
         finalNodes.push(newNode);
         elementLabelToId.set(newElement.label, newNode.id);
         affectedElementIds.push(newNode.id);
-      }
-    });
+      });
+    }
 
     // Handle flows/edges
     const finalEdges = [...currentEdges];
