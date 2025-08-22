@@ -19,9 +19,8 @@ class AIService {
     this.reasoningExclude = process.env.REASONING_EXCLUDE === 'true';
     
     if (!this.apiKey || !this.baseURL) {
-      console.error('❌ Missing required environment variables');
-      console.error('❌ API Key:', !!this.apiKey);
-      console.error('❌ Base URL:', this.baseURL);
+      console.error('❌ Missing required environment variables for AI service');
+      throw new Error('AI Service is not configured. Missing OPENROUTER_API_KEY or OPENROUTER_BASE_URL.');
     }
   }
 
