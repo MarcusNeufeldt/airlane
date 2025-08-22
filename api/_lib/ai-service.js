@@ -9,6 +9,8 @@ class AIService {
     
     console.log('🔧 AIService constructor');
     console.log('🔑 API Key exists:', !!this.apiKey);
+    console.log('🔑 API Key value:', this.apiKey ? `"${this.apiKey}"` : 'undefined');
+    console.log('🔑 API Key length:', this.apiKey ? this.apiKey.length : 0);
     console.log('🌐 Base URL:', this.baseURL);
     console.log('🤖 Default model:', this.defaultModel);
     
@@ -23,6 +25,32 @@ class AIService {
       console.error('❌ API Key:', !!this.apiKey);
       console.error('❌ Base URL:', this.baseURL);
     }
+    
+    // Validate API key format
+    if (this.apiKey) {
+      // Check for invalid characters that might cause header issues
+      const invalidChars = /[\r\n\t\0]/;
+      if (invalidChars.test(this.apiKey)) {
+        console.error('❌ API Key contains invalid characters (newlines, tabs, etc.)');
+        console.error('❌ API Key bytes:', Array.from(this.apiKey).map(c => c.charCodeAt(0)));
+      }
+    }
+  }
+
+  // Get safe authorization header
+  getAuthHeader() {
+    if (!this.apiKey || this.apiKey === 'placeholder') {
+      throw new Error('No valid API key configured. Please set OPENROUTER_API_KEY environment variable.');
+    }
+    
+    // Clean the API key of any invalid characters
+    const cleanApiKey = this.apiKey.trim().replace(/[\r\n\t\0]/g, '');
+    
+    if (cleanApiKey !== this.apiKey) {
+      console.warn('⚠️ API key contained invalid characters, cleaned');
+    }
+    
+    return `Bearer ${cleanApiKey}`;
   }
 
   // Get reasoning configuration for API calls
@@ -183,7 +211,7 @@ Respond ONLY with valid JSON matching the required BPMN process format. Do not i
         ...this.getReasoningConfig()
       }, {
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': this.getAuthHeader(),
           'Content-Type': 'application/json',
           'HTTP-Referer': 'http://localhost:3000',
           'X-Title': 'Process Pipeline Creator'
@@ -359,7 +387,7 @@ ${currentProcess ? JSON.stringify(currentProcess, null, 2) : 'No process is on t
           ...this.getReasoningConfig()
         }, {
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            'Authorization': this.getAuthHeader(),
             'Content-Type': 'application/json',
             'HTTP-Referer': 'http://localhost:3000',
             'X-Title': 'Database Diagram Tool'
@@ -389,16 +417,16 @@ ${currentProcess ? JSON.stringify(currentProcess, null, 2) : 'No process is on t
         console.log('Function calling failed, falling back to text analysis:', functionCallError.response?.data?.error?.message);
         
         // Fallback: Use text-based intent detection
-        const intentPrompt = `You are Data Modeler AI, an assistant embedded in a visual database diagramming tool. Analyze this user message and determine their intent:
+        const intentPrompt = `You are Process Modeler AI, an assistant embedded in a visual BPMN process modeling tool. Analyze this user message and determine their intent:
 
 User message: "${userMessage}"
 
-Current schema exists: ${currentSchema ? 'Yes' : 'No'}
+Current process exists: ${currentProcess ? 'Yes' : 'No'}
 
 Respond with ONLY ONE of these exact phrases:
-- "GENERATE_SCHEMA" - if they want to create a new schema
-- "MODIFY_SCHEMA" - if they want to change the existing schema  
-- "ANALYZE_SCHEMA" - if they want analysis only
+- "GENERATE_PROCESS" - if they want to create a new process from scratch
+- "MODIFY_PROCESS" - if they want to change the existing process  
+- "ANALYZE_PROCESS" - if they want analysis only
 - "CHAT" - if it's a general question
 
 Intent:`;
@@ -410,7 +438,7 @@ Intent:`;
           ...this.getReasoningConfig()
         }, {
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            'Authorization': this.getAuthHeader(),
             'Content-Type': 'application/json',
             'HTTP-Referer': 'http://localhost:3000',
             'X-Title': 'Database Diagram Tool'
@@ -464,7 +492,7 @@ Intent:`;
             ...this.getReasoningConfig()
           }, {
             headers: {
-              'Authorization': `Bearer ${this.apiKey}`,
+              'Authorization': this.getAuthHeader(),
               'Content-Type': 'application/json',
               'HTTP-Referer': 'http://localhost:3000',
               'X-Title': 'Database Diagram Tool'
@@ -476,6 +504,137 @@ Intent:`;
             content: chatResponse.data.choices[0].message.content
           };
         }
+      }
+    } catch (error) {
+      console.error('AI Chat Error:', error.response?.data || error.message);
+      throw new Error(`Chat failed: ${error.response?.data?.error?.message || error.message}`);
+    }
+  }
+
+  // Legacy method for backward compatibility with schema-focused chat
+  async chatAboutSchema(userMessage, currentSchema = null, conversationHistory = []) {
+    try {
+      console.log('🔄 Using legacy chatAboutSchema method');
+      console.log('📊 Current schema exists:', !!currentSchema);
+      
+      // Build the conversation with system prompt for schema context
+      const messages = [
+        {
+          role: 'system',
+          content: `You are an expert AI assistant embedded within a **visual, web-based database schema modeling tool**. Your name is "Schema Designer AI".
+
+Your primary role is to help users design and modify database schemas by interacting with a visual canvas.
+
+**Key Concepts of Your Environment:**
+- The user is looking at an interactive **canvas**.
+- The database tables are represented as **nodes** on the canvas.
+- The relationships (foreign keys) are represented as **edges** or **connections** between the nodes.
+- When you modify the schema, the canvas updates visually.
+
+**CRITICAL INSTRUCTIONS:**
+1. **Interpret "Connections":** When a user mentions "connections," "relationships," or "links," they are referring to the **visual relationships on the canvas**. If they say "connections are lost," it means the visual relationships disappeared after your last modification.
+2. **Handle Vague Requests:** If a user's request is too vague, ask for clarification or propose specific changes.
+3. **Be Specific:** When you use a tool to modify the schema, be specific about what you did.
+
+Current schema on the canvas:
+${currentSchema ? JSON.stringify(currentSchema, null, 2) : 'No schema is on the canvas yet.'}`
+        }
+      ];
+
+      // Add conversation history
+      if (conversationHistory && conversationHistory.length > 0) {
+        messages.push(...conversationHistory.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })));
+      }
+
+      // Add current user message
+      messages.push({ role: 'user', content: userMessage });
+
+      // Determine intent
+      const intentPrompt = `Based on this user message: "${userMessage}"
+
+Classify the intent as one of:
+- "GENERATE_SCHEMA" - if they want to create a new schema from scratch
+- "MODIFY_SCHEMA" - if they want to change the existing schema  
+- "ANALYZE_SCHEMA" - if they want analysis only
+- "CHAT" - if it's a general question
+
+Intent:`;
+
+      const intentResponse = await axios.post(`${this.baseURL}/chat/completions`, {
+        model: this.defaultModel,
+        messages: [{ role: "user", content: intentPrompt }],
+        temperature: 0.1,
+        ...this.getReasoningConfig()
+      }, {
+        headers: {
+          'Authorization': this.getAuthHeader(),
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'http://localhost:3000',
+          'X-Title': 'Database Diagram Tool'
+        }
+      });
+
+      const intent = intentResponse.data.choices[0].message.content.trim();
+      
+      if (intent === 'GENERATE_SCHEMA') {
+        return {
+          type: 'tool_call',
+          tool_call: {
+            function: {
+              name: 'generate_database_schema',
+              arguments: JSON.stringify({ description: userMessage })
+            }
+          },
+          message: "I'll generate a schema for you."
+        };
+      } else if (intent === 'MODIFY_SCHEMA') {
+        return {
+          type: 'tool_call',
+          tool_call: {
+            function: {
+              name: 'modify_existing_schema',
+              arguments: JSON.stringify({ 
+                modification_type: 'modify_table', 
+                description: userMessage 
+              })
+            }
+          },
+          message: "I'll modify the schema for you."
+        };
+      } else if (intent === 'ANALYZE_SCHEMA') {
+        return {
+          type: 'tool_call',
+          tool_call: {
+            function: {
+              name: 'analyze_current_schema',
+              arguments: JSON.stringify({ analysis_type: 'general' })
+            }
+          },
+          message: "I'll analyze your schema."
+        };
+      } else {
+        // Regular chat fallback
+        const chatResponse = await axios.post(`${this.baseURL}/chat/completions`, {
+          model: this.defaultModel,
+          messages: messages,
+          temperature: 0.7,
+          ...this.getReasoningConfig()
+        }, {
+          headers: {
+            'Authorization': this.getAuthHeader(),
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'http://localhost:3000',
+            'X-Title': 'Database Diagram Tool'
+          }
+        });
+
+        return {
+          type: 'message',
+          content: chatResponse.data.choices[0].message.content
+        };
       }
     } catch (error) {
       console.error('AI Chat Error:', error.response?.data || error.message);
@@ -516,7 +675,7 @@ Format your response in clear markdown with proper headers and bullet points.`;
         ...this.getReasoningConfig()
       }, {
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': this.getAuthHeader(),
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://signavio-clone.local',
           'X-Title': 'BPMN Process Modeling Tool'
@@ -550,7 +709,7 @@ Format your response in clear markdown with proper headers and bullet points.`;
           max_tokens: 150,
         }, {
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            'Authorization': this.getAuthHeader(),
             'Content-Type': 'application/json',
             'HTTP-Referer': 'https://signavio.vercel.app',
             'X-Title': 'BPMN Process Modeling Tool'
@@ -610,7 +769,7 @@ Respond with plain text analysis, not as a tool call.`;
 
       const response = await axios.post(`${this.baseURL}/chat/completions`, requestBody, {
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': this.getAuthHeader(),
           'Content-Type': 'application/json',
         },
       });
