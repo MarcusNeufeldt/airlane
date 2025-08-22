@@ -179,7 +179,7 @@ export class BPMNService {
       
       laneElements.forEach((lane, index) => {
         const laneId = lane.getAttribute('id') || `lane_${index}`;
-        const laneName = lane.getAttribute('name') || `Lane ${index + 1}`;
+        const laneName = (lane.getAttribute('name') || `Lane ${index + 1}`).replace(/&#10;/g, '\n');
         const color = generateLaneColor(index);
         lanes.set(laneId, { name: laneName, color });
         console.log(`🏊 Lane ${index}: ${laneId} (${laneName}) - color: ${color}`);
@@ -204,7 +204,7 @@ export class BPMNService {
       const participants = collaboration.querySelectorAll('participant');
       participants.forEach((participant, index) => {
         const poolId = participant.getAttribute('id') || `pool_${index}`;
-        const poolName = participant.getAttribute('name') || `Pool ${index + 1}`;
+        const poolName = (participant.getAttribute('name') || `Pool ${index + 1}`).replace(/&#10;/g, '\n');
         const color = generatePoolColor(index);
         pools.set(poolId, { name: poolName, color });
 
@@ -227,6 +227,44 @@ export class BPMNService {
       });
     }
     
+    // =================================================================
+    // == START OF FIX: Explicitly create Lane nodes as visual containers
+    // =================================================================
+    allProcesses.forEach(proc => {
+      const laneElements = proc.querySelectorAll('lane');
+      laneElements.forEach((lane) => {
+        const laneId = lane.getAttribute('id') || '';
+        const laneName = (lane.getAttribute('name') || 'Lane').replace(/&#10;/g, '\n');
+        const positionData = shapePositions.get(laneId);
+
+        if (positionData) {
+          console.log(`✅ Creating LaneNode for ${laneId} (${laneName})`);
+          const laneInfo = lanes.get(laneId);
+          nodes.push({
+            id: laneId,
+            type: 'lane',
+            position: { x: positionData.x, y: positionData.y },
+            data: {
+              id: laneId,
+              label: laneName,
+              nodeType: 'lane',
+              width: positionData.width,
+              height: positionData.height,
+              backgroundColor: laneInfo?.color,
+              assignee: laneName,
+            },
+            // Lanes should be behind tasks but in front of pools
+            zIndex: -10,
+          });
+        } else {
+          console.warn(`⚠️ Could not find position data for lane ${laneId}`);
+        }
+      });
+    });
+    // =================================================================
+    // == END OF FIX
+    // =================================================================
+    
     console.log(`Found ${lanes.size} lanes and ${pools.size} pools`);
     console.log('Lane assignments:', Array.from(elementLaneMap.entries()));
 
@@ -238,10 +276,10 @@ export class BPMNService {
       const element = elementsToProcess[i];
       const tagName = element.tagName.toLowerCase();
       const id = element.getAttribute('id') || `element_${i}`;
-      const name = element.getAttribute('name') || '';
+      const name = (element.getAttribute('name') || '').replace(/&#10;/g, '\n');
       
-      // Skip sequence flows (we'll process them as edges)
-      if (tagName === 'sequenceflow') continue;
+      // Skip sequence flows and lanes (we'll process them separately)
+      if (tagName === 'sequenceflow' || tagName === 'lane' || tagName === 'laneset') continue;
       
       // Get position and dimensions from diagram
       const positionData = shapePositions.get(id) || { x: 100 + (i * 150), y: 200, width: 100, height: 80 };
@@ -292,19 +330,7 @@ export class BPMNService {
       } else if (tagName.includes('gateway')) {
         nodeType = 'gateway';
         nodeData.gatewayType = getGatewayType(element);
-      } else if (tagName === 'lane') {
-        nodeType = 'lane';
-        nodeData.nodeType = 'lane';
-        nodeData.laneId = id;
-        // CHANGE 5: Apply the real width and height from the diagram data
-        nodeData.width = positionData.width;
-        nodeData.height = positionData.height;
-      } else if (tagName === 'participant') {
-        nodeType = 'pool';
-        nodeData.participant = name;
-        // Use actual dimensions from BPMN file
-        nodeData.width = positionData.width;
-        nodeData.height = positionData.height;
+
       } else if (tagName.includes('dataobject')) {
         nodeType = 'data-object';
         nodeData.dataType = 'input';
@@ -316,8 +342,8 @@ export class BPMNService {
           type: nodeType,
           position,
           data: nodeData,
-          // CHANGE 6: Set zIndex for lanes, otherwise default is fine
-          zIndex: nodeType === 'lane' ? -10 : 0,
+          // All flow elements on top
+          zIndex: 0,
         });
       }
     }
