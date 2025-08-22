@@ -493,7 +493,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
         const nodeMap = new Map(newNodes.map(n => [n.id, n]));
     
         // 2. Layout nodes within each container (lane)
-        for (const [parentId, childrenIds] of Array.from(parentMap.entries())) {
+        for (const [/*parentId*/, childrenIds] of Array.from(parentMap.entries())) {
           const containerNodes = childrenIds.map(id => nodeMap.get(id)!);
           const containerEdges = edges.filter(e => childrenIds.includes(e.source) && childrenIds.includes(e.target));
     
@@ -547,7 +547,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
           // 4. Position nodes based on ranks
           const rankedNodes = new Map<number, string[]>();
           let maxRank = 0;
-          for (const [nodeId, rank] of ranks.entries()) {
+          for (const [nodeId, rank] of Array.from(ranks.entries())) {
             if (!rankedNodes.has(rank)) {
               rankedNodes.set(rank, []);
             }
