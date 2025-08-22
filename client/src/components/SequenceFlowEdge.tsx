@@ -56,30 +56,22 @@ export const SequenceFlowEdge: React.FC<EdgeProps> = ({
     // Snap coordinates to grid
     const snapToGrid = (value: number) => Math.round(value / gridSize) * gridSize;
     
-    // Calculate connection points based on node positions
-    const getConnectionPoint = (x: number, y: number, position: Position, offset: number = 50) => {
-      switch (position) {
-        case Position.Right:
-          return { x: x + offset, y: y };
-        case Position.Left:
-          return { x: x - offset, y: y };
-        case Position.Top:
-          return { x: x, y: y - offset };
-        case Position.Bottom:
-          return { x: x, y: y + offset };
-        default:
-          return { x: x + offset, y: y };
-      }
+    // Calculate connection points - sourceX/sourceY are already the handle positions
+    // We just need to use them directly since ReactFlow provides the exact connection points
+    const getConnectionPoint = (x: number, y: number, position: Position) => {
+      // ReactFlow already provides the exact connection point coordinates
+      // sourceX/sourceY and targetX/targetY are the handle centers
+      return { x, y };
     };
 
     const source = getConnectionPoint(sourceX, sourceY, sourcePosition);
     const target = getConnectionPoint(targetX, targetY, targetPosition);
 
-    // Snap to grid
-    const startX = snapToGrid(source.x);
-    const startY = snapToGrid(source.y);
-    const endX = snapToGrid(target.x);
-    const endY = snapToGrid(target.y);
+    // Use exact connection points (don't snap them to grid)
+    const startX = source.x;
+    const startY = source.y;
+    const endX = target.x;
+    const endY = target.y;
 
     // Calculate waypoints for Manhattan routing
     const waypoints: Array<{x: number, y: number}> = [
@@ -99,13 +91,15 @@ export const SequenceFlowEdge: React.FC<EdgeProps> = ({
       if (sourcePosition === Position.Right || sourcePosition === Position.Left) {
         // Start horizontally from source
         const intermediateX = startX + (endX - startX) * 0.6;
-        waypoints.push({ x: snapToGrid(intermediateX), y: startY });
-        waypoints.push({ x: snapToGrid(intermediateX), y: endY });
+        const gridAlignedX = snapToGrid ? snapToGrid(intermediateX) : intermediateX;
+        waypoints.push({ x: gridAlignedX, y: startY });
+        waypoints.push({ x: gridAlignedX, y: endY });
       } else {
         // Start vertically from source
         const intermediateY = startY + (endY - startY) * 0.6;
-        waypoints.push({ x: startX, y: snapToGrid(intermediateY) });
-        waypoints.push({ x: endX, y: snapToGrid(intermediateY) });
+        const gridAlignedY = snapToGrid ? snapToGrid(intermediateY) : intermediateY;
+        waypoints.push({ x: startX, y: gridAlignedY });
+        waypoints.push({ x: endX, y: gridAlignedY });
       }
     } else if (horizontalDistance > gridSize) {
       // Only horizontal movement
