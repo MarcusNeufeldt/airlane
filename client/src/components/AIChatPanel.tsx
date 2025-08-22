@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles, RefreshCw, RotateCcw, Paperclip, X } from 'lucide-react';
-import { aiService, ChatMessage, ProcessModel, DatabaseSchema } from '../services/aiService';
+import { aiService, ChatMessage, ProcessModel } from '../services/aiService';
 import { useDiagramStore } from '../stores/diagramStore';
 
 interface AIChatPanelProps {
@@ -134,6 +134,152 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
     });
 
     return { elements, flows };
+  };
+
+  // Apply process changes to the canvas
+  const applyProcessChanges = (processModel: ProcessModel, isModification: boolean = false) => {
+    console.log('🔄 applyProcessChanges called:', { isModification, nodeCount: nodes.length, processModel });
+
+    if (!isModification || nodes.length === 0) {
+      // Full replacement mode
+      const newNodes = processModel.elements.map((element) => ({
+        id: element.id,
+        type: element.type as any,
+        position: element.position,
+        data: {
+          id: element.id,
+          nodeType: element.type,
+          label: element.label,
+          description: element.description,
+          ...element.properties
+        },
+      }));
+      
+      const newEdges = processModel.flows.map(flow => ({
+        id: flow.id,
+        type: flow.type,
+        source: flow.source,
+        target: flow.target,
+        data: {
+          label: flow.label,
+          condition: flow.condition,
+          isDefault: flow.isDefault,
+          messageType: flow.messageType
+        }
+      }));
+      
+      console.log('🔄 Applying full process replacement to canvas:', { nodes: newNodes.length, edges: newEdges.length });
+      importDiagram({ nodes: newNodes, edges: newEdges });
+      newNodes.forEach(node => {
+        flashTable(node.id);
+      });
+      return;
+    }
+
+    // Incremental modification mode
+    const currentProcess = getCurrentProcess();
+    if (!currentProcess) {
+      // Fallback if we can't get current state
+      applyProcessChanges(processModel, false);
+      return;
+    }
+    
+    console.log('🔄 Performing atomic incremental update for process model');
+    const finalState = computeFinalProcessState(currentProcess, processModel);
+    
+    console.log('✅ Final state computed:', { nodes: finalState.nodes.length, edges: finalState.edges.length, affected: finalState.affectedElementIds.length });
+    importDiagram({ nodes: finalState.nodes, edges: finalState.edges });
+    finalState.affectedElementIds.forEach(id => {
+      flashTable(id);
+    });
+  };
+
+  // Compute the final process state for incremental modifications
+  const computeFinalProcessState = (currentProcess: ProcessModel, newProcess: ProcessModel) => {
+    const currentNodes = [...nodes];
+    const currentEdges = [...edges];
+    const affectedElementIds: string[] = [];
+
+    // Create lookup maps for the new process
+    const newElementsByLabel = new Map(newProcess.elements.map(e => [e.label, e]));
+    const elementLabelToId = new Map(currentNodes.map(n => [n.data.label, n.id]));
+
+    // Track existing elements and update them if they exist in the new process
+    const finalNodes = currentNodes.map((node) => {
+      const newElement = newElementsByLabel.get(node.data.label);
+      if (newElement) {
+        // Update existing element data
+        affectedElementIds.push(node.id);
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            label: newElement.label,
+            description: newElement.description,
+            ...newElement.properties
+          }
+        };
+      }
+      return node;
+    });
+
+    // Add new elements that don't exist in current process
+    newProcess.elements.forEach((newElement) => {
+      if (!elementLabelToId.has(newElement.label)) {
+        const newNode = {
+          id: newElement.id || `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          type: newElement.type as any,
+          position: newElement.position,
+          data: {
+            id: newElement.id,
+            nodeType: newElement.type,
+            label: newElement.label,
+            description: newElement.description,
+            ...newElement.properties
+          },
+        };
+        finalNodes.push(newNode);
+        elementLabelToId.set(newElement.label, newNode.id);
+        affectedElementIds.push(newNode.id);
+      }
+    });
+
+    // Handle flows/edges
+    const finalEdges = [...currentEdges];
+    
+    // Create a set of current flow keys for comparison
+    const currentFlowKeys = new Set(currentEdges.map(edge => `${edge.source}->${edge.target}`));
+
+    // Add new flows from the AI model
+    newProcess.flows.forEach((newFlow) => {
+      const sourceElement = newProcess.elements.find(e => e.id === newFlow.source);
+      const targetElement = newProcess.elements.find(e => e.id === newFlow.target);
+      if (sourceElement && targetElement) {
+        const sourceNodeId = elementLabelToId.get(sourceElement.label);
+        const targetNodeId = elementLabelToId.get(targetElement.label);
+        if (sourceNodeId && targetNodeId) {
+          const flowKey = `${sourceNodeId}->${targetNodeId}`;
+          if (!currentFlowKeys.has(flowKey)) {
+            console.log(`+ Adding new flow: ${sourceElement.label} -> ${targetElement.label}`);
+            const newEdge = {
+              id: newFlow.id || `edge-${Date.now()}-${finalEdges.length}`,
+              type: newFlow.type,
+              source: sourceNodeId,
+              target: targetNodeId,
+              data: {
+                label: newFlow.label,
+                condition: newFlow.condition,
+                isDefault: newFlow.isDefault,
+                messageType: newFlow.messageType,
+              },
+            };
+            finalEdges.push(newEdge);
+          }
+        }
+      }
+    });
+
+    return { nodes: finalNodes, edges: finalEdges, affectedElementIds };
   };
 
   const handleSendMessage = async () => {
