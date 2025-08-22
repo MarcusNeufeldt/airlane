@@ -70,15 +70,14 @@ function getTaskType(element: Element): string {
 
 // Helper function to generate lane colors
 function generateLaneColor(index: number): string {
+  // CHANGE: Use a more professional, muted color palette
   const colors = [
-    '#3B82F6', // blue
-    '#10B981', // emerald
-    '#F59E0B', // amber
-    '#EF4444', // red
-    '#8B5CF6', // violet
-    '#06B6D4', // cyan
-    '#84CC16', // lime
-    '#F97316', // orange
+    '#f5f5f5', // Light Gray
+    '#e3f2fd', // Faint Blue
+    '#e8eaf6', // Faint Indigo
+    '#e0f2f1', // Faint Teal
+    '#f1f8e9', // Faint Green
+    '#fffde7', // Faint Yellow
   ];
   return colors[index % colors.length];
 }
@@ -228,8 +227,14 @@ export class BPMNService {
     }
     
     // =================================================================
-    // == START OF FIX: Explicitly create Lane nodes as visual containers
+    // == START OF FIX: Create Lane nodes with parent-child relationships
     // =================================================================
+    let participantId: string | null = null;
+    if (collaboration) {
+      const participant = collaboration.querySelector('participant');
+      participantId = participant?.getAttribute('id') || null;
+    }
+
     allProcesses.forEach(proc => {
       const laneElements = proc.querySelectorAll('lane');
       laneElements.forEach((lane) => {
@@ -238,9 +243,10 @@ export class BPMNService {
         const positionData = shapePositions.get(laneId);
 
         if (positionData) {
-          console.log(`✅ Creating LaneNode for ${laneId} (${laneName})`);
+          console.log(`✅ Creating LaneNode for ${laneId} (${laneName}) with parent: ${participantId}`);
           const laneInfo = lanes.get(laneId);
-          nodes.push({
+          
+          const laneNode: any = {
             id: laneId,
             type: 'lane',
             position: { x: positionData.x, y: positionData.y },
@@ -255,7 +261,15 @@ export class BPMNService {
             },
             // Lanes should be behind tasks but in front of pools
             zIndex: -10,
-          });
+          };
+          
+          // CHANGE: Assign lane to its parent pool if available
+          if (participantId) {
+            laneNode.parentNode = participantId;
+            laneNode.extent = 'parent';
+          }
+          
+          nodes.push(laneNode);
         } else {
           console.warn(`⚠️ Could not find position data for lane ${laneId}`);
         }
@@ -337,14 +351,23 @@ export class BPMNService {
       }
       
       if (nodeType) {
-        nodes.push({
+        const elementNode: any = {
           id,
           type: nodeType,
           position,
           data: nodeData,
           // All flow elements on top
           zIndex: 0,
-        });
+        };
+        
+        // CHANGE: Assign element to its lane as a parent
+        if (assignedLaneId) {
+          elementNode.parentNode = assignedLaneId;
+          elementNode.extent = 'parent'; // Constrain element within its lane
+          console.log(`🔗 Element ${id} assigned to parent lane ${assignedLaneId}`);
+        }
+        
+        nodes.push(elementNode);
       }
     }
     
