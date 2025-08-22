@@ -3,12 +3,14 @@ require('dotenv').config();
 
 class AIService {
   constructor() {
-    this.apiKey = process.env.OPENROUTER_API_KEY;
-    this.baseURL = process.env.OPENROUTER_BASE_URL;
-    this.defaultModel = process.env.DEFAULT_AI_MODEL || 'anthropic/claude-3.5-sonnet';
+    // Sanitize API key to remove any hidden characters, newlines, or whitespace
+    this.apiKey = process.env.OPENROUTER_API_KEY?.trim().replace(/[\r\n\t]/g, '');
+    this.baseURL = process.env.OPENROUTER_BASE_URL?.trim();
+    this.defaultModel = process.env.DEFAULT_AI_MODEL?.trim() || 'anthropic/claude-3.5-sonnet';
     
     console.log('🔧 AIService constructor');
     console.log('🔑 API Key exists:', !!this.apiKey);
+    console.log('🔑 API Key length:', this.apiKey?.length);
     console.log('🌐 Base URL:', this.baseURL);
     console.log('🤖 Default model:', this.defaultModel);
     
@@ -46,6 +48,22 @@ class AIService {
     }
     
     return config;
+  }
+
+  // Get safe headers with properly formatted Authorization
+  getSafeHeaders(additionalHeaders = {}) {
+    if (!this.apiKey) {
+      throw new Error('API key is not configured');
+    }
+    
+    // Ensure the API key is clean and properly formatted
+    const cleanApiKey = this.apiKey.replace(/[^\w\-\.]/g, '');
+    
+    return {
+      'Authorization': `Bearer ${cleanApiKey}`,
+      'Content-Type': 'application/json',
+      ...additionalHeaders
+    };
   }
 
   // Schema definitions for structured output (BPMN process format)
@@ -182,12 +200,10 @@ Respond ONLY with valid JSON matching the required BPMN process format. Do not i
         temperature: 0.1,
         ...this.getReasoningConfig()
       }, {
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
+        headers: this.getSafeHeaders({
           'HTTP-Referer': 'http://localhost:3000',
           'X-Title': 'Process Pipeline Creator'
-        }
+        })
       });
 
       let content = response.data.choices[0].message.content;
@@ -409,12 +425,10 @@ Intent:`;
           temperature: 0.1,
           ...this.getReasoningConfig()
         }, {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
+          headers: this.getSafeHeaders({
             'HTTP-Referer': 'http://localhost:3000',
             'X-Title': 'Database Diagram Tool'
-          }
+          })
         });
 
         const intent = intentResponse.data.choices[0].message.content.trim();
@@ -463,12 +477,10 @@ Intent:`;
             temperature: 0.7,
             ...this.getReasoningConfig()
           }, {
-            headers: {
-              'Authorization': `Bearer ${this.apiKey}`,
-              'Content-Type': 'application/json',
+            headers: this.getSafeHeaders({
               'HTTP-Referer': 'http://localhost:3000',
               'X-Title': 'Database Diagram Tool'
-            }
+            })
           });
 
           return {
@@ -515,12 +527,10 @@ Format your response in clear markdown with proper headers and bullet points.`;
         temperature: 0.7,
         ...this.getReasoningConfig()
       }, {
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
+        headers: this.getSafeHeaders({
           'HTTP-Referer': 'https://signavio-clone.local',
           'X-Title': 'BPMN Process Modeling Tool'
-        }
+        })
       });
 
       console.log('✅ Process analysis complete');
@@ -549,12 +559,10 @@ Format your response in clear markdown with proper headers and bullet points.`;
           temperature: 0.2,
           max_tokens: 150,
         }, {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
+          headers: this.getSafeHeaders({
             'HTTP-Referer': 'https://signavio.vercel.app',
             'X-Title': 'BPMN Process Modeling Tool'
-          }
+          })
         });
         
         const summary = response.data.choices[0].message.content.trim();
@@ -609,10 +617,7 @@ Respond with plain text analysis, not as a tool call.`;
       console.log('📤 Sending analysis request to:', this.baseURL);
 
       const response = await axios.post(`${this.baseURL}/chat/completions`, requestBody, {
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
+        headers: this.getSafeHeaders(),
       });
 
       console.log('📥 Analysis response status:', response.status);
