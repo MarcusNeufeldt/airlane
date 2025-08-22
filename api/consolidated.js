@@ -1086,7 +1086,7 @@ module.exports = async (req, res) => {
     if (method === 'POST' && url.includes('/diagram-chat')) {
       const urlParams = new URLSearchParams(url.split('?')[1] || '');
       const diagramId = urlParams.get('id');
-      const { message, currentProcess, images } = body;
+      const { message, currentProcess, currentSchema, images } = body;
       
       if (!diagramId) {
         return res.status(400).json({ error: 'Diagram ID is required as query parameter' });
@@ -1136,7 +1136,7 @@ module.exports = async (req, res) => {
         
         // Always use process-focused method
         let aiResponse;
-        aiResponse = await aiService.chatAboutProcess(message, currentProcess || null, conversationHistory, images);
+        aiResponse = await aiService.chatAboutProcess(message, currentProcess || null, conversationHistory, images, currentSchema || null);
         
         console.log('🤖 AI response received');
         console.log('🔍 Response type:', aiResponse.type);

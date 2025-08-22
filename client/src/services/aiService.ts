@@ -117,7 +117,7 @@ class AIService {
   }
 
   // New method for posting messages to the stateful chat endpoint
-  async postChatMessage(diagramId: string, message: string, currentProcess?: ProcessModel, images?: string[]): Promise<any> {
+  async postChatMessage(diagramId: string, message: string, currentProcess?: ProcessModel, currentSchema?: DatabaseSchema, images?: string[]): Promise<any> {
     console.log(`💬 Posting message to diagram ${diagramId}:`, message.substring(0, 100));
     if (images && images.length > 0) {
       console.log(`🖼️ Including ${images.length} images in request`);
@@ -126,7 +126,7 @@ class AIService {
     const response = await fetch(`${API_BASE_URL}/diagram-chat?id=${diagramId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, currentProcess, images }),
+      body: JSON.stringify({ message, currentProcess, currentSchema, images }),
     });
     
     if (!response.ok) {

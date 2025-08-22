@@ -757,15 +757,17 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
 
     try {
       const currentProcess = getCurrentProcess();
+      const currentSchema = getCurrentSchema();
       console.log('🎯 Sending message to AI via stateful chat:', currentInput);
       console.log('📊 Current process:', currentProcess);
+      console.log('📦 Current schema:', currentSchema);
       console.log('📍 Diagram ID:', currentDiagramId);
       console.log('🖼️ Images attached:', currentImages.length);
 
       const imageDataUrls = await Promise.all(currentImages.map(img => convertImageToBase64(img.file)));
 
       // This is the key change: use the stateful endpoint
-      const response = await aiService.postChatMessage(currentDiagramId, currentInput, currentProcess, imageDataUrls);
+      const response = await aiService.postChatMessage(currentDiagramId, currentInput, currentProcess, currentSchema, imageDataUrls);
       
       console.log('📦 Response from stateful chat:', response);
 

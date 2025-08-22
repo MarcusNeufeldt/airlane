@@ -3,9 +3,9 @@ require('dotenv').config();
 
 class AIService {
   constructor() {
-    this.apiKey = process.env.OPENROUTER_API_KEY;
+    this.apiKey = process.env.OPENROUTER_API_KEY ? process.env.OPENROUTER_API_KEY.trim() : null;
     this.baseURL = process.env.OPENROUTER_BASE_URL;
-    this.defaultModel = process.env.DEFAULT_AI_MODEL || 'anthropic/claude-3.5-sonnet';
+    this.defaultModel = (process.env.DEFAULT_AI_MODEL ? process.env.DEFAULT_AI_MODEL.trim() : null) || 'anthropic/claude-3.5-sonnet';
     
     console.log('🔧 AIService constructor');
     console.log('🔑 API Key exists:', !!this.apiKey);
@@ -19,9 +19,8 @@ class AIService {
     this.reasoningExclude = process.env.REASONING_EXCLUDE === 'true';
     
     if (!this.apiKey || !this.baseURL) {
-      console.error('❌ Missing required environment variables');
-      console.error('❌ API Key:', !!this.apiKey);
-      console.error('❌ Base URL:', this.baseURL);
+      console.error('❌ Missing required environment variables for AI service');
+      throw new Error('AI Service is not configured. Missing OPENROUTER_API_KEY or OPENROUTER_BASE_URL.');
     }
   }
 
@@ -282,7 +281,7 @@ Respond ONLY with valid JSON matching the required BPMN process format. Do not i
   }
 
   // Chat with AI about the process (with function calling)
-  async chatAboutProcess(userMessage, currentProcess = null, conversationHistory = [], images = []) {
+  async chatAboutProcess(userMessage, currentProcess = null, conversationHistory = [], images = [], currentSchema = null) {
     try {
       // Check if any previous messages mention images
       const conversationMentionsImages = conversationHistory.some(msg => 
@@ -316,7 +315,10 @@ You have access to these tools:
 3. analyze_current_process - Analyze the current process and provide insights.
 
 Current process on the canvas:
-${currentProcess ? JSON.stringify(currentProcess, null, 2) : 'No process is on the canvas yet.'}`;
+${currentProcess ? JSON.stringify(currentProcess, null, 2) : 'No process is on the canvas yet.'}
+
+Current database schema on the canvas (for context):
+${currentSchema ? JSON.stringify(currentSchema, null, 2) : 'No schema is on the canvas yet.'}`;
 
       // Construct user message with images if provided
       let userContent = userMessage;
