@@ -134,12 +134,18 @@ export class BPMNService {
     // Get the process element
     const process = xmlDoc.querySelector('process');
     if (!process) {
-      throw new Error('No process element found in BPMN file');
+      // CHANGE 1: Find process within a participant if it's not top-level
+      const participant = xmlDoc.querySelector('participant');
+      const processId = participant?.getAttribute('processRef');
+      if (!processId || !xmlDoc.querySelector(`process[id="${processId}"]`)) {
+        throw new Error('No process element found in BPMN file');
+      }
     }
 
     // Get diagram information for positions - handle both namespaced and non-namespaced elements
     const shapes = xmlDoc.querySelectorAll('bpmndi\\:BPMNShape, BPMNShape');
-    const shapePositions = new Map<string, { x: number, y: number }>();
+    // CHANGE 2: The map will now store the full bounds object
+    const shapePositions = new Map<string, { x: number, y: number, width: number, height: number }>();
     
     console.log(`Found ${shapes.length} shape definitions`);
     
@@ -149,8 +155,11 @@ export class BPMNService {
       if (elementId && bounds) {
         const x = parseFloat(bounds.getAttribute('x') || '0');
         const y = parseFloat(bounds.getAttribute('y') || '0');
-        console.log(`Shape ${index}: ${elementId} at (${x}, ${y})`);
-        shapePositions.set(elementId, { x, y });
+        // CHANGE 3: Extract and store width and height
+        const width = parseFloat(bounds.getAttribute('width') || '100');
+        const height = parseFloat(bounds.getAttribute('height') || '80');
+        console.log(`Shape ${index}: ${elementId} at (${x}, ${y}) with size (${width}x${height})`);
+        shapePositions.set(elementId, { x, y, width, height });
       }
     });
     
@@ -161,27 +170,31 @@ export class BPMNService {
     const pools = new Map<string, { name: string, color: string }>();
     const elementLaneMap = new Map<string, string>(); // elementId -> laneId
     
-    // Look for lanes in the process
-    const laneElements = process.querySelectorAll('lane');
-    console.log(`🔍 Found ${laneElements.length} lane elements`);
+    // Look for lanes in all processes (handle multiple processes)
+    const allProcesses = xmlDoc.querySelectorAll('process');
     
-    laneElements.forEach((lane, index) => {
-      const laneId = lane.getAttribute('id') || `lane_${index}`;
-      const laneName = lane.getAttribute('name') || `Lane ${index + 1}`;
-      const color = generateLaneColor(index);
-      lanes.set(laneId, { name: laneName, color });
-      console.log(`🏊 Lane ${index}: ${laneId} (${laneName}) - color: ${color}`);
+    allProcesses.forEach(proc => {
+      const laneElements = proc.querySelectorAll('lane');
+      console.log(`🔍 Found ${laneElements.length} lane elements in process ${proc.id || 'unnamed'}`);
       
-      // Map flow nodes to this lane
-      const flowNodeRefs = lane.querySelectorAll('flowNodeRef');
-      console.log(`   Found ${flowNodeRefs.length} flowNodeRefs in lane ${laneId}`);
-      
-      flowNodeRefs.forEach(ref => {
-        const elementId = ref.textContent?.trim();
-        if (elementId) {
-          elementLaneMap.set(elementId, laneId);
-          console.log(`   📋 Mapped ${elementId} → ${laneId}`);
-        }
+      laneElements.forEach((lane, index) => {
+        const laneId = lane.getAttribute('id') || `lane_${index}`;
+        const laneName = lane.getAttribute('name') || `Lane ${index + 1}`;
+        const color = generateLaneColor(index);
+        lanes.set(laneId, { name: laneName, color });
+        console.log(`🏊 Lane ${index}: ${laneId} (${laneName}) - color: ${color}`);
+        
+        // Map flow nodes to this lane
+        const flowNodeRefs = lane.querySelectorAll('flowNodeRef');
+        console.log(`   Found ${flowNodeRefs.length} flowNodeRefs in lane ${laneId}`);
+        
+        flowNodeRefs.forEach(ref => {
+          const elementId = ref.textContent?.trim();
+          if (elementId) {
+            elementLaneMap.set(elementId, laneId);
+            console.log(`   📋 Mapped ${elementId} → ${laneId}`);
+          }
+        });
       });
     });
     
@@ -194,17 +207,35 @@ export class BPMNService {
         const poolName = participant.getAttribute('name') || `Pool ${index + 1}`;
         const color = generatePoolColor(index);
         pools.set(poolId, { name: poolName, color });
+
+        // CHANGE 4: Create pool node with proper dimensions and z-index
+        const positionData = shapePositions.get(poolId) || { x: 50, y: 50, width: 1200, height: 800 };
+        nodes.push({
+          id: poolId,
+          type: 'pool',
+          position: { x: positionData.x, y: positionData.y },
+          data: {
+            id: poolId,
+            label: poolName,
+            participant: poolName,
+            width: positionData.width,
+            height: positionData.height
+          },
+          // CHANGE 4: Set zIndex to ensure it's in the background
+          zIndex: -20,
+        });
       });
     }
     
     console.log(`Found ${lanes.size} lanes and ${pools.size} pools`);
     console.log('Lane assignments:', Array.from(elementLaneMap.entries()));
 
-    // Process all BPMN elements
-    const elements = process.children;
+    // Process all BPMN elements from all processes
+    const elementsToProcess: Element[] = [];
+    allProcesses.forEach(p => elementsToProcess.push(...Array.from(p.children)));
     
-    for (let i = 0; i < elements.length; i++) {
-      const element = elements[i];
+    for (let i = 0; i < elementsToProcess.length; i++) {
+      const element = elementsToProcess[i];
       const tagName = element.tagName.toLowerCase();
       const id = element.getAttribute('id') || `element_${i}`;
       const name = element.getAttribute('name') || '';
@@ -212,9 +243,10 @@ export class BPMNService {
       // Skip sequence flows (we'll process them as edges)
       if (tagName === 'sequenceflow') continue;
       
-      // Get position from diagram
-      const position = shapePositions.get(id) || { x: 100 + (i * 150), y: 200 };
-      console.log(`Node ${id}: position (${position.x}, ${position.y}) - ${shapePositions.has(id) ? 'from diagram' : 'fallback'}`);
+      // Get position and dimensions from diagram
+      const positionData = shapePositions.get(id) || { x: 100 + (i * 150), y: 200, width: 100, height: 80 };
+      const position = { x: positionData.x, y: positionData.y };
+      console.log(`Node ${id}: position(${position.x}, ${position.y}) - ${shapePositions.has(id) ? 'from diagram' : 'fallback'}`);
       
       // Check if element is assigned to a lane
       const assignedLaneId = elementLaneMap.get(id);
@@ -262,22 +294,17 @@ export class BPMNService {
         nodeData.gatewayType = getGatewayType(element);
       } else if (tagName === 'lane') {
         nodeType = 'lane';
+        nodeData.nodeType = 'lane';
         nodeData.laneId = id;
-        const bounds = shapePositions.get(id);
-        if (bounds) {
-          // Lanes are wider
-          nodeData.width = 600;
-          nodeData.height = 150;
-        }
+        // CHANGE 5: Apply the real width and height from the diagram data
+        nodeData.width = positionData.width;
+        nodeData.height = positionData.height;
       } else if (tagName === 'participant') {
         nodeType = 'pool';
         nodeData.participant = name;
-        const bounds = shapePositions.get(id);
-        if (bounds) {
-          // Pools are even wider
-          nodeData.width = 800;
-          nodeData.height = 400;
-        }
+        // Use actual dimensions from BPMN file
+        nodeData.width = positionData.width;
+        nodeData.height = positionData.height;
       } else if (tagName.includes('dataobject')) {
         nodeType = 'data-object';
         nodeData.dataType = 'input';
@@ -289,14 +316,17 @@ export class BPMNService {
           type: nodeType,
           position,
           data: nodeData,
+          // CHANGE 6: Set zIndex for lanes, otherwise default is fine
+          zIndex: nodeType === 'lane' ? -10 : 0,
         });
       }
     }
     
-    // Process sequence flows as edges
-    const sequenceFlows = process.querySelectorAll('sequenceFlow');
-    console.log(`Found ${sequenceFlows.length} sequence flows`);
-    sequenceFlows.forEach((flow, index) => {
+    // Process sequence flows as edges from all processes
+    const allSequenceFlows: Element[] = [];
+    allProcesses.forEach(p => allSequenceFlows.push(...Array.from(p.querySelectorAll('sequenceFlow'))));
+    console.log(`Found ${allSequenceFlows.length} sequence flows`);
+    allSequenceFlows.forEach((flow, index) => {
       const id = flow.getAttribute('id') || `flow_${index}`;
       const source = flow.getAttribute('sourceRef');
       const target = flow.getAttribute('targetRef');
