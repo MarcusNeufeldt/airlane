@@ -437,9 +437,17 @@ module.exports = async (req, res) => {
         
         const aiService = new AIService();
         
-        // Always use process-focused method
+        // Use appropriate method based on what data is provided
         let response;
-        response = await aiService.chatAboutProcess(message, currentProcess || null, conversationHistory || []);
+        if (currentSchema && !currentProcess) {
+          // Legacy schema-focused chat
+          console.log('🔄 Using legacy schema chat method');
+          response = await aiService.chatAboutSchema(message, currentSchema, conversationHistory || []);
+        } else {
+          // Process-focused method (default)
+          console.log('🔄 Using process chat method');
+          response = await aiService.chatAboutProcess(message, currentProcess || null, conversationHistory || []);
+        }
         
         console.log('✅ Chat response generated');
         console.log('🔍 Response type:', response.type);
@@ -477,6 +485,9 @@ module.exports = async (req, res) => {
           // Legacy schema tool calls (for backward compatibility)
           else if (toolCall.function.name === 'analyze_current_schema') {
             console.log('🔍 Executing schema analysis (legacy)');
+            if (!currentSchema) {
+              return res.json({ content: 'No schema available to analyze. Please provide a current schema or create one first.' });
+            }
             const analysis = await aiService.analyzeSchema(currentSchema);
             return res.json({ content: analysis });
           } else if (toolCall.function.name === 'generate_database_schema') {
@@ -486,6 +497,9 @@ module.exports = async (req, res) => {
             return res.json({ schema, content: 'I\'ve generated a new database schema for you.' });
           } else if (toolCall.function.name === 'modify_existing_schema') {
             console.log('🔄 Executing schema modification (legacy)');
+            if (!currentSchema) {
+              return res.json({ content: 'No current schema available to modify. Please provide a current schema first.' });
+            }
             const args = JSON.parse(toolCall.function.arguments);
             
             // Generate the AI's proposed schema
