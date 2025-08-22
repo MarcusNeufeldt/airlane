@@ -5,7 +5,7 @@ class AIService {
   constructor() {
     this.apiKey = process.env.OPENROUTER_API_KEY ? process.env.OPENROUTER_API_KEY.trim() : null;
     this.baseURL = process.env.OPENROUTER_BASE_URL;
-    this.defaultModel = process.env.DEFAULT_AI_MODEL || 'anthropic/claude-3.5-sonnet';
+    this.defaultModel = (process.env.DEFAULT_AI_MODEL ? process.env.DEFAULT_AI_MODEL.trim() : null) || 'anthropic/claude-3.5-sonnet';
     
     console.log('🔧 AIService constructor');
     console.log('🔑 API Key exists:', !!this.apiKey);
