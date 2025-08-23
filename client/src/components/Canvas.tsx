@@ -602,26 +602,56 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
     const sourceNode = nodes.find(n => n.id === quickNodeSelector.sourceNodeId);
     if (!sourceNode) return;
 
-    // Calculate position based on direction
-    // Use larger offset and account for node sizes
-    const offset = 200; // Increased offset for better spacing
-    const nodeWidth = 150; // Approximate node width
-    const nodeHeight = 80; // Approximate node height
+    // Get accurate dimensions for different node types
+    const getNodeDimensions = (nodeType: string, eventType?: string) => {
+      switch (nodeType) {
+        case 'process':
+          return { width: 160, height: 80 };
+        case 'event':
+          return { width: 60, height: 60 }; // Events are circular
+        case 'gateway':
+          return { width: 60, height: 60 }; // Gateways are diamond-shaped
+        case 'data-object':
+          return { width: 80, height: 90 };
+        default:
+          return { width: 150, height: 80 };
+      }
+    };
+
+    // Calculate position based on direction with proper center alignment
+    const sourceWidth = sourceNode.width || getNodeDimensions(sourceNode.type || 'process').width;
+    const sourceHeight = sourceNode.height || getNodeDimensions(sourceNode.type || 'process').height;
+    const newNodeDimensions = getNodeDimensions(nodeType, eventType);
+    const newNodeWidth = newNodeDimensions.width;
+    const newNodeHeight = newNodeDimensions.height;
+    const gap = 80; // Gap between nodes
     
-    let position = { x: sourceNode.position.x, y: sourceNode.position.y };
+    // Calculate source node center
+    const sourceCenterX = sourceNode.position.x + sourceWidth / 2;
+    const sourceCenterY = sourceNode.position.y + sourceHeight / 2;
+    
+    let position = { x: 0, y: 0 };
     
     switch (direction) {
       case 'right':
-        position.x += nodeWidth + 50; // Node width plus gap
+        // Place new node to the right, centered vertically with source
+        position.x = sourceNode.position.x + sourceWidth + gap;
+        position.y = sourceCenterY - newNodeHeight / 2;
         break;
       case 'down':
-        position.y += nodeHeight + 50; // Node height plus gap
+        // Place new node below, centered horizontally with source
+        position.x = sourceCenterX - newNodeWidth / 2;
+        position.y = sourceNode.position.y + sourceHeight + gap;
         break;
       case 'left':
-        position.x -= nodeWidth + 50; // Node width plus gap
+        // Place new node to the left, centered vertically with source
+        position.x = sourceNode.position.x - newNodeWidth - gap;
+        position.y = sourceCenterY - newNodeHeight / 2;
         break;
       case 'up':
-        position.y -= nodeHeight + 50; // Node height plus gap
+        // Place new node above, centered horizontally with source
+        position.x = sourceCenterX - newNodeWidth / 2;
+        position.y = sourceNode.position.y - newNodeHeight - gap;
         break;
     }
 
@@ -634,12 +664,18 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
       options = { dataType: eventType };
     }
 
+    // Snap position to grid if enabled
+    const finalPosition = snapToGrid ? {
+      x: Math.round(position.x / gridSize) * gridSize,
+      y: Math.round(position.y / gridSize) * gridSize,
+    } : position;
+
     // Store connection info before creating node
     const sourceNodeId = quickNodeSelector.sourceNodeId;
     const currentDirection = direction; // Capture direction for closure
     
     // Create the new node - the store will generate the ID
-    addNode(nodeType as any, position, options);
+    addNode(nodeType as any, finalPosition, options);
 
     // Create automatic connection between source and new node
     // We'll find the most recently created node as the target
