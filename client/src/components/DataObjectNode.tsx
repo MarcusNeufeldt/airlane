@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { DataObjectNodeData } from '../types';
 import { useDiagramStore } from '../stores/diagramStore';
-import { FileText, Database, Archive, Download, Upload } from 'lucide-react';
+import { FileText, Database, Archive } from 'lucide-react';
 
 export const DataObjectNode: React.FC<NodeProps<DataObjectNodeData>> = ({ id, data, selected }) => {
   const { updateNode } = useDiagramStore();
@@ -28,89 +28,65 @@ export const DataObjectNode: React.FC<NodeProps<DataObjectNodeData>> = ({ id, da
     }
   };
 
-  const getDataIcon = () => {
-    if (data.dataObjectType === 'data-store') {
-      return <Database className="w-5 h-5 text-gray-700" />;
-    }
-    // Default to document icon for 'data-object' or if type is undefined
-    return <FileText className="w-5 h-5 text-gray-700" />;
-  };
-
-  const getBackgroundColor = () => {
-    // A neutral color for both data objects and data stores.
-    // The distinction is the icon.
-    return 'bg-gray-50 border-gray-400';
-  };
-
   return (
-    <div className="relative group">
+    <div 
+      className="relative group flex flex-col items-center justify-center"
+      style={{ width: 80, height: 90 }} // Smaller, invisible bounding box for handles
+    >
       {/* Connection handles - data objects typically connect via associations */}
       <Handle 
         type="target" 
         position={Position.Top} 
-        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform" 
+        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
         id="association-top"
       />
       <Handle 
         type="target" 
         position={Position.Left} 
-        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform" 
+        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
         id="association-left"
       />
       <Handle 
         type="source" 
         position={Position.Right} 
-        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform" 
+        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
         id="association-right"
       />
       <Handle 
         type="source" 
         position={Position.Bottom} 
-        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-60 group-hover:!opacity-100" 
+        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
         id="association-bottom"
       />
       
-      <div
-        className={`border-2 shadow-md transition-all duration-150 hover:shadow-lg ${getBackgroundColor()} ${
-          selected ? 'ring-2 ring-blue-400' : ''
-        }`}
-        style={{
-          width: 100,
-          height: 80,
-          clipPath: 'polygon(0% 0%, 85% 0%, 100% 20%, 100% 100%, 0% 100%)',
-        }}
+      {/* Visible Content: Icon and Label */}
+      <div 
+        className={`flex flex-col items-center p-2 rounded-md transition-all ${selected ? 'bg-blue-100 ring-2 ring-blue-400' : 'bg-transparent'}`}
         onDoubleClick={handleDoubleClick}
       >
-        <div className="p-2 flex flex-col items-center justify-center h-full">
-          {/* Data type icon */}
-          <div className="mb-1">
-            {getDataIcon()}
-          </div>
-          
-          {/* Data object label */}
-          {isEditing ? (
-            <input
-              value={label}
-              onChange={handleLabelChange}
-              onBlur={handleLabelBlur}
-              onKeyDown={handleKeyDown}
-              className="w-full text-center text-xs bg-transparent border-b border-gray-400 outline-none font-medium"
-              style={{ fontSize: '10px' }}
-              autoFocus
-            />
-          ) : (
-            <span className="text-center text-xs font-medium leading-tight" style={{ fontSize: '10px' }}>
-              {data.label || 'Data'}
-            </span>
-          )}
-          
-          {/* Data state */}
-          {data.state && (
-            <div className="text-xs text-gray-600 mt-1 leading-none" style={{ fontSize: '8px' }}>
-              [{data.state}]
-            </div>
-          )}
+        {/* Icon */}
+        <div className="mb-1">
+          {data.dataObjectType === 'data-store' 
+            ? <Database className="w-8 h-8 text-gray-700" /> 
+            : <FileText className="w-8 h-8 text-gray-700" />
+          }
         </div>
+        
+        {/* Label */}
+        {isEditing ? (
+          <input
+            value={label}
+            onChange={handleLabelChange}
+            onBlur={handleLabelBlur}
+            onKeyDown={handleKeyDown}
+            className="w-20 text-center text-xs bg-white border-b border-gray-400 outline-none font-medium"
+            autoFocus
+          />
+        ) : (
+          <span className="text-center text-xs font-medium leading-tight max-w-[80px]">
+            {data.label || 'Data'}
+          </span>
+        )}
       </div>
       
       {/* Collection indicator for collection type */}
