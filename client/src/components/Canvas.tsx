@@ -659,6 +659,9 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
     let options = {};
     if (nodeType === 'event' && eventType) {
       options = { eventType };
+    } else if (nodeType === 'gateway' && eventType) {
+      // For gateways, eventType is actually the gatewayType (subType)
+      options = { gatewayType: eventType };
     } else if (nodeType === 'data-object' && eventType) {
       // For data objects, eventType is actually the dataType
       options = { dataType: eventType };

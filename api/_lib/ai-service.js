@@ -567,6 +567,206 @@ Format your response in clear markdown with proper headers and bullet points.`;
     }
   }
 
+  async suggestNextNode(sourceNodeId, currentProcess, context = 'Suggest the most logical next BPMN element') {
+    try {
+      console.log('🤖 Starting AI node suggestion for:', sourceNodeId);
+      
+      // Find the source node
+      const sourceNode = currentProcess.elements.find(el => el.id === sourceNodeId);
+      if (!sourceNode) {
+        throw new Error(`Source node with ID ${sourceNodeId} not found`);
+      }
+
+      // Analyze the context around the source node
+      const connectedFlows = currentProcess.flows.filter(flow => 
+        flow.source === sourceNodeId || flow.target === sourceNodeId
+      );
+
+      const prompt = `You are an expert BPMN process designer. Given the current process context, suggest the most logical next BPMN element.
+
+**Current Process Context:**
+- Total elements: ${currentProcess.elements.length}
+- Total flows: ${currentProcess.flows.length}
+
+**Source Node (where user clicked):**
+- ID: ${sourceNode.id}
+- Type: ${sourceNode.type}
+- Label: ${sourceNode.label}
+- Properties: ${JSON.stringify(sourceNode.properties || {}, null, 2)}
+
+**Connected Flows:**
+${connectedFlows.map(flow => `- ${flow.type}: ${flow.source} → ${flow.target} ${flow.label ? `(${flow.label})` : ''}`).join('\n')}
+
+**Full Process Elements:**
+${currentProcess.elements.map(el => `- ${el.type}: ${el.label} (${el.id})`).join('\n')}
+
+**Context:** ${context}
+
+Based on BPMN best practices and the current process state, suggest the next most logical element to add.
+
+**IMPORTANT:** Keep the reasoning very brief (maximum 1-2 sentences). Focus on the core logic, not detailed explanations.
+
+Respond with a JSON object in this exact format:
+{
+  "nodeType": "process|event|gateway|data-object",
+  "subType": "start|end|intermediate|exclusive|parallel|inclusive|user|service|manual|input|output|storage|reference",
+  "label": "Suggested node name",
+  "reasoning": "Very brief explanation (1-2 sentences max)",
+  "confidence": 0.8,
+  "direction": "right|down|left|up",
+  "properties": {
+    "eventType": "start|intermediate|end",
+    "gatewayType": "exclusive|parallel|inclusive|event-based|complex",
+    "taskType": "user|service|manual|script|business-rule|send|receive",
+    "dataType": "input|output|collection|storage|reference"
+  }
+}
+
+Only include properties that are relevant to the suggested node type.`;
+
+      const response = await axios.post(`${this.baseURL}/chat/completions`, {
+        model: this.defaultModel,
+        messages: [
+          { 
+            role: "system", 
+            content: "You are an expert BPMN process designer who provides intelligent suggestions for process modeling. Always respond with valid JSON." 
+          },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.3, // Lower temperature for more consistent suggestions
+        ...this.getReasoningConfig()
+      }, {
+        headers: this.getSafeHeaders({
+          'HTTP-Referer': 'https://airlane-bpmn.local',
+          'X-Title': 'AI Smart Node Suggestion'
+        })
+      });
+
+      const responseContent = response.data.choices[0].message.content;
+      console.log('🤖 AI suggestion raw response:', responseContent);
+
+      // Parse the JSON response
+      let suggestion;
+      try {
+        // Extract JSON from the response (in case it's wrapped in markdown)
+        const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
+        const jsonString = jsonMatch ? jsonMatch[0] : responseContent;
+        suggestion = JSON.parse(jsonString);
+      } catch (parseError) {
+        console.error('❌ Failed to parse AI suggestion JSON:', parseError);
+        // Fallback suggestion
+        suggestion = this.getFallbackSuggestion(sourceNode);
+      }
+
+      // Validate and clean the suggestion
+      suggestion = this.validateSuggestion(suggestion);
+      
+      console.log('✅ AI node suggestion generated:', suggestion);
+      return suggestion;
+    } catch (error) {
+      console.error('❌ AI Node Suggestion Error:', error.response?.data || error.message);
+      // Return fallback suggestion instead of throwing
+      const sourceNode = currentProcess.elements.find(el => el.id === sourceNodeId);
+      return this.getFallbackSuggestion(sourceNode);
+    }
+  }
+
+  // Helper method to create fallback suggestions
+  getFallbackSuggestion(sourceNode) {
+    if (!sourceNode) {
+      return {
+        nodeType: 'process',
+        label: 'Process Task',
+        reasoning: 'Default suggestion when source node not found',
+        confidence: 0.5,
+        direction: 'right'
+      };
+    }
+
+    switch (sourceNode.type) {
+      case 'event':
+        if (sourceNode.properties?.eventType === 'start') {
+                  return {
+          nodeType: 'process',
+          label: 'First Process Step',
+          reasoning: 'Start events need a first business activity',
+          confidence: 0.8,
+          direction: 'right',
+          properties: { taskType: 'user' }
+        };
+        }
+        return {
+          nodeType: 'event',
+          subType: 'end',
+          label: 'End Event',
+          reasoning: 'Completes the process flow',
+          confidence: 0.7,
+          direction: 'right',
+          properties: { eventType: 'end' }
+        };
+        
+      case 'process':
+        return {
+          nodeType: 'gateway',
+          subType: 'exclusive',
+          label: 'Decision Gateway',
+          reasoning: 'Tasks often need decision points',
+          confidence: 0.6,
+          direction: 'right',
+          properties: { gatewayType: 'exclusive' }
+        };
+        
+      case 'gateway':
+        return {
+          nodeType: 'process',
+          label: 'Process Task',
+          reasoning: 'Gateways split to activities',
+          confidence: 0.7,
+          direction: 'down',
+          properties: { taskType: 'user' }
+        };
+        
+      default:
+        return {
+          nodeType: 'process',
+          label: 'Process Task',
+          reasoning: 'Standard activity',
+          confidence: 0.5,
+          direction: 'right',
+          properties: { taskType: 'user' }
+        };
+    }
+  }
+
+  // Helper method to validate and clean suggestions
+  validateSuggestion(suggestion) {
+    const validNodeTypes = ['process', 'event', 'gateway', 'data-object'];
+    const validDirections = ['up', 'down', 'left', 'right'];
+
+    // Ensure required fields exist and are valid
+    if (!validNodeTypes.includes(suggestion.nodeType)) {
+      suggestion.nodeType = 'process';
+    }
+    
+    if (!validDirections.includes(suggestion.direction)) {
+      suggestion.direction = 'right';
+    }
+
+    if (!suggestion.label) {
+      suggestion.label = 'Suggested Node';
+    }
+
+    if (!suggestion.reasoning) {
+      suggestion.reasoning = 'AI suggested this as the next logical step';
+    }
+
+    if (typeof suggestion.confidence !== 'number' || suggestion.confidence < 0 || suggestion.confidence > 1) {
+      suggestion.confidence = 0.7;
+    }
+
+    return suggestion;
+  }
+
   async summarizeProcess(process) {
       try {
         console.log('📝 Starting process summarization');

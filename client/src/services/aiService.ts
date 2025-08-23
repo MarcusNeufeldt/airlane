@@ -46,6 +46,22 @@ export interface ProcessFlow {
   messageType?: string;
 }
 
+export interface AINodeSuggestion {
+  nodeType: 'process' | 'event' | 'gateway' | 'data-object';
+  subType?: string;
+  label: string;
+  reasoning: string;
+  confidence: number;
+  direction: 'up' | 'down' | 'left' | 'right';
+  properties?: {
+    eventType?: 'start' | 'intermediate' | 'end';
+    processType?: 'task' | 'subprocess';
+    taskType?: 'user' | 'service' | 'manual' | 'script' | 'business-rule' | 'send' | 'receive';
+    gatewayType?: 'exclusive' | 'parallel' | 'inclusive' | 'event-based' | 'complex';
+    dataType?: 'input' | 'output' | 'collection' | 'storage' | 'reference';
+  };
+}
+
 // Legacy interfaces for backward compatibility
 export interface DatabaseSchema {
   tables: Table[];
@@ -481,6 +497,108 @@ ${process.elements.map(e => `- ${e.type}: ${e.label}`).join('\n')}
 - Validate sequence flow connections
 
 *Note: This is a basic analysis. Connect to the AI backend for detailed BPMN compliance checking and optimization suggestions.*`;
+    }
+  }
+
+  async suggestNextNode(
+    sourceNodeId: string, 
+    currentProcess: ProcessModel,
+    context?: string
+  ): Promise<AINodeSuggestion> {
+    console.log('🤖 suggestNextNode called for node:', sourceNodeId);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/suggest-next-node`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          sourceNodeId, 
+          currentProcess,
+          context: context || 'Suggest the most logical next BPMN element'
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('❌ AI node suggestion failed:', response.status);
+        throw new Error(`AI suggestion failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ AI suggestion received:', data);
+      return data.suggestion;
+    } catch (error) {
+      console.error('❌ Error getting AI node suggestion:', error);
+      
+      // Fallback suggestion based on simple heuristics
+      return this.getFallbackSuggestion(sourceNodeId, currentProcess);
+    }
+  }
+
+  private getFallbackSuggestion(sourceNodeId: string, currentProcess: ProcessModel): AINodeSuggestion {
+    const sourceNode = currentProcess.elements.find(el => el.id === sourceNodeId);
+    
+    if (!sourceNode) {
+      return {
+        nodeType: 'process',
+        label: 'Process Task',
+        reasoning: 'Default suggestion when source node not found',
+        confidence: 0.5,
+        direction: 'right'
+      };
+    }
+
+    // Simple fallback logic based on node type
+    switch (sourceNode.type) {
+      case 'event':
+        if (sourceNode.properties?.eventType === 'start') {
+          return {
+            nodeType: 'process',
+            label: 'First Process Step',
+            reasoning: 'Start events are typically followed by the first business activity',
+            confidence: 0.8,
+            direction: 'right'
+          };
+        }
+        return {
+          nodeType: 'event',
+          subType: 'end',
+          label: 'End Event',
+          reasoning: 'Complete the process flow',
+          confidence: 0.7,
+          direction: 'right',
+          properties: { eventType: 'end' }
+        };
+        
+      case 'process':
+        return {
+          nodeType: 'gateway',
+          subType: 'exclusive',
+          label: 'Decision Gateway',
+          reasoning: 'Process tasks often need decision points',
+          confidence: 0.6,
+          direction: 'right',
+          properties: { gatewayType: 'exclusive' }
+        };
+        
+      case 'gateway':
+        return {
+          nodeType: 'process',
+          label: 'Process Task',
+          reasoning: 'Gateways split flow to process activities',
+          confidence: 0.7,
+          direction: 'down'
+        };
+        
+      default:
+        return {
+          nodeType: 'process',
+          label: 'Process Task',
+          reasoning: 'Standard process activity',
+          confidence: 0.5,
+          direction: 'right'
+        };
     }
   }
 

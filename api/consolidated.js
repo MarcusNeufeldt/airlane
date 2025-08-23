@@ -389,6 +389,32 @@ module.exports = async (req, res) => {
         return res.status(500).json({ error: 'Failed to analyze process', details: error.message });
       }
     }
+
+    // Route: POST /suggest-next-node
+    if (method === 'POST' && url.includes('/suggest-next-node')) {
+      try {
+        const { sourceNodeId, currentProcess, context } = body;
+        
+        if (!sourceNodeId || !currentProcess) {
+          return res.status(400).json({ 
+            error: 'sourceNodeId and currentProcess are required' 
+          });
+        }
+
+        console.log('🤖 AI suggesting next node for:', sourceNodeId);
+        const aiService = new AIService();
+        const suggestion = await aiService.suggestNextNode(sourceNodeId, currentProcess, context);
+        console.log('✅ AI suggestion generated');
+        
+        return res.json({ suggestion });
+      } catch (error) {
+        console.error('❌ AI node suggestion failed:', error.message);
+        return res.status(500).json({ 
+          error: 'Failed to get AI suggestion', 
+          details: error.message 
+        });
+      }
+    }
     
     if (method === 'POST' && url.includes('/summarize-process')) {
         try {
