@@ -33,6 +33,7 @@ import { AlignmentToolbar } from './AlignmentToolbar';
 import { ZoomToolbar } from './ZoomToolbar';
 import { ProcessContextMenu } from './ProcessContextMenu';
 import { QuickNodeSelector } from './QuickNodeSelector';
+import { AlignmentGuides } from './AlignmentGuides';
 
 const nodeTypes: NodeTypes = {
   process: ProcessNode,
@@ -107,6 +108,9 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
     y: number;
     sourceNodeId: string;
   } | null>(null);
+  
+  const [isDragging, setIsDragging] = useState(false);
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   
   // Sort nodes by z-index to ensure proper layering
   const sortedNodes = React.useMemo(() => {
@@ -805,6 +809,18 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
     }
   }, [setSelectedNodes, selectNode]);
 
+  // Handle drag start
+  const handleNodeDragStart = useCallback((_event: React.MouseEvent, node: Node) => {
+    setIsDragging(true);
+    setDraggingNodeId(node.id);
+  }, []);
+
+  // Handle drag stop
+  const handleNodeDragStop = useCallback(() => {
+    setIsDragging(false);
+    setDraggingNodeId(null);
+  }, []);
+
   // Removed double-click handlers for tables and edges since we're using process modeling now
 
   return (
@@ -820,6 +836,8 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
         onPaneContextMenu={handlePaneContextMenu}
         onNodeContextMenu={handleNodeContextMenu}
         onNodeClick={handleNodeClick}
+        onNodeDragStart={handleNodeDragStart}
+        onNodeDragStop={handleNodeDragStop}
         onSelectionChange={handleSelectionChange}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
@@ -879,6 +897,13 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
           position={alignmentToolbarPosition}
         />
       )}
+
+      {/* Dynamic Alignment Guides */}
+      <AlignmentGuides 
+        nodes={nodes} 
+        isDragging={isDragging} 
+        draggingNodeId={draggingNodeId} 
+      />
 
       {/* Context Menu */}
       {contextMenu && (

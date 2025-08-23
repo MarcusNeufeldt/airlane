@@ -165,6 +165,48 @@ const snapToGridPosition = (position: { x: number; y: number }, gridSize: number
   };
 };
 
+// Helper function to find alignment positions for a node
+const findAlignmentPositions = (
+  dragNode: { position: { x: number; y: number }; width?: number; height?: number },
+  otherNodes: Array<{ position: { x: number; y: number }; width?: number; height?: number }>,
+  threshold: number = 15
+) => {
+  const dragBounds = {
+    left: dragNode.position.x,
+    right: dragNode.position.x + (dragNode.width || 150),
+    top: dragNode.position.y,
+    bottom: dragNode.position.y + (dragNode.height || 80),
+    centerX: dragNode.position.x + (dragNode.width || 150) / 2,
+    centerY: dragNode.position.y + (dragNode.height || 80) / 2,
+  };
+
+  let snapX = null;
+  let snapY = null;
+
+  for (const node of otherNodes) {
+    const nodeBounds = {
+      left: node.position.x,
+      right: node.position.x + (node.width || 150),
+      top: node.position.y,
+      bottom: node.position.y + (node.height || 80),
+      centerX: node.position.x + (node.width || 150) / 2,
+      centerY: node.position.y + (node.height || 80) / 2,
+    };
+
+    // Check horizontal center alignment (Y position)
+    if (Math.abs(dragBounds.centerY - nodeBounds.centerY) < threshold) {
+      snapY = nodeBounds.centerY - (dragNode.height || 80) / 2;
+    }
+
+    // Check vertical center alignment (X position)  
+    if (Math.abs(dragBounds.centerX - nodeBounds.centerX) < threshold) {
+      snapX = nodeBounds.centerX - (dragNode.width || 150) / 2;
+    }
+  }
+
+  return { snapX, snapY };
+};
+
 const createSetStateWithHistory = (get: any, set: any) => {
   return (newState: Partial<DiagramState>, actionName: string) => {
     const { history, historyIndex, maxHistorySize } = get();
