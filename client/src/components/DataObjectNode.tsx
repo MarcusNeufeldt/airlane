@@ -33,30 +33,30 @@ export const DataObjectNode: React.FC<NodeProps<DataObjectNodeData>> = ({ id, da
       className="relative group flex flex-col items-center justify-center"
       style={{ width: 80, height: 90 }} // Smaller, invisible bounding box for handles
     >
-      {/* Connection handles - data objects typically connect via associations */}
+      {/* Connection handles - positioned directly on the icon edges */}
       <Handle 
         type="target" 
-        position={Position.Top} 
-        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
         id="association-top"
+        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
+        style={{ top: 20, left: '50%', transform: 'translate(-50%, -50%)' }}
       />
       <Handle 
         type="target" 
-        position={Position.Left} 
-        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
         id="association-left"
+        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
+        style={{ top: '50%', left: 24, transform: 'translate(-50%, -50%)' }}
       />
       <Handle 
         type="source" 
-        position={Position.Right} 
-        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
         id="association-right"
+        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
+        style={{ top: '50%', right: 14, transform: 'translate(50%, -50%)' }}
       />
       <Handle 
         type="source" 
-        position={Position.Bottom} 
-        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
         id="association-bottom"
+        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
+        style={{ bottom: 18, top: 'auto', left: '50%', transform: 'translate(-50%, 50%)' }}
       />
       
       {/* Visible Content: Icon and Label */}
