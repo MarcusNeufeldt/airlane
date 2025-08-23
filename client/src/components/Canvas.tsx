@@ -25,6 +25,7 @@ import { PoolWithLanesNode } from './PoolWithLanesNode';
 import { DataObjectNode } from './DataObjectNode';
 import { SequenceFlowEdge } from './SequenceFlowEdge';
 import { MessageFlowEdge } from './MessageFlowEdge';
+import { AssociationEdge } from './AssociationEdge';
 import { StickyNote } from './StickyNote';
 import { Shape } from './Shape';
 import { CanvasSearch } from './CanvasSearch';
@@ -47,6 +48,7 @@ const nodeTypes: NodeTypes = {
 const edgeTypes: EdgeTypes = {
   'sequence-flow': SequenceFlowEdge,
   'message-flow': MessageFlowEdge,
+  'association': AssociationEdge,
 };
 
 interface CanvasProps {

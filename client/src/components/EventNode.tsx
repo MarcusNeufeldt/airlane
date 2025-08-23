@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { EventNodeData } from '../types';
 import { useDiagramStore } from '../stores/diagramStore';
-import { Play, Square, Circle } from 'lucide-react';
+import { Play, Square, Circle, Zap, Timer, MessageSquare } from 'lucide-react';
 
 export const EventNode: React.FC<NodeProps<EventNodeData>> = ({ id, data, selected }) => {
   const { updateNode, showLaneColors, simulationActiveNodes, isSimulating, animatingNodeIds } = useDiagramStore();
@@ -28,7 +28,23 @@ export const EventNode: React.FC<NodeProps<EventNodeData>> = ({ id, data, select
     }
   };
   const isAnimating = animatingNodeIds.has(id);
+
+  const getEventIcon = () => {
+    switch (data.eventSubType) {
+      case 'error':
+        return <Zap className="w-4 h-4 text-red-600" />;
+      case 'timer':
+        return <Timer className="w-4 h-4 text-indigo-600" />;
+      case 'message':
+        return <MessageSquare className="w-4 h-4 text-blue-600" />;
+      default:
+        return null;
+    }
+  };
+
   const getEventStyles = () => {
+    let icon = getEventIcon();
+
     switch (data.eventType) {
       case 'start':
         return {
@@ -54,13 +70,21 @@ export const EventNode: React.FC<NodeProps<EventNodeData>> = ({ id, data, select
           bgColor: '#fecaca', // red-100
           icon: <Square className="w-4 h-4 text-red-600" />
         };
+      case 'boundary':
+        return {
+          borderColor: '#6b7280', // gray-500
+          borderWidth: '2px',
+          borderStyle: 'dashed',
+          bgColor: '#f3f4f6', // gray-100
+          icon: icon || <Circle className="w-4 h-4 text-gray-600" />
+        };
       default:
         return {
           borderColor: '#6b7280', // gray-500
           borderWidth: '2px',
           borderStyle: 'solid',
           bgColor: '#f3f4f6', // gray-100
-          icon: <Circle className="w-4 h-4 text-gray-600" />
+          icon: icon || <Circle className="w-4 h-4 text-gray-600" />
         };
     }
   };
@@ -108,7 +132,7 @@ export const EventNode: React.FC<NodeProps<EventNodeData>> = ({ id, data, select
       )}
       
       {/* Intermediate Event: Both inputs and outputs (can occur during the process) */}
-      {data.eventType === 'intermediate' && (
+      {(data.eventType === 'intermediate' || data.eventType === 'boundary') && (
         <>
           <Handle 
             type="target" 

@@ -48,23 +48,24 @@ const INTERNAL_TO_BPMN_TYPE: Record<string, string> = {
 };
 
 // Helper function to determine event type
-function getEventType(element: Element): 'start' | 'intermediate' | 'end' {
+function getEventType(element: Element): 'start' | 'intermediate' | 'end' | 'boundary' {
   const tagName = element.tagName.toLowerCase();
-  if (tagName.includes('start')) return 'start';
-  if (tagName.includes('end')) return 'end';
+  if (tagName.includes('startevent')) return 'start';
+  if (tagName.includes('endevent')) return 'end';
+  if (tagName.includes('boundaryevent')) return 'boundary';
   return 'intermediate';
 }
 
 // Helper function to determine task type
 function getTaskType(element: Element): string {
   const tagName = element.tagName.toLowerCase();
-  if (tagName.includes('user')) return 'user';
-  if (tagName.includes('service')) return 'service';
-  if (tagName.includes('script')) return 'script';
-  if (tagName.includes('send')) return 'send';
-  if (tagName.includes('receive')) return 'receive';
-  if (tagName.includes('manual')) return 'manual';
-  if (tagName.includes('businessrule')) return 'business-rule';
+  if (tagName.includes('usertask')) return 'user';
+  if (tagName.includes('servicetask')) return 'service';
+  if (tagName.includes('scripttask')) return 'script';
+  if (tagName.includes('sendtask')) return 'send';
+  if (tagName.includes('receivetask')) return 'receive';
+  if (tagName.includes('manualtask')) return 'manual';
+  if (tagName.includes('businessruletask')) return 'business-rule';
   return 'user';
 }
 
@@ -96,11 +97,11 @@ function generatePoolColor(index: number): string {
 // Helper function to determine gateway type
 function getGatewayType(element: Element): string {
   const tagName = element.tagName.toLowerCase();
-  if (tagName.includes('exclusive')) return 'exclusive';
-  if (tagName.includes('parallel')) return 'parallel';
-  if (tagName.includes('inclusive')) return 'inclusive';
-  if (tagName.includes('eventbased')) return 'event-based';
-  if (tagName.includes('complex')) return 'complex';
+  if (tagName.includes('exclusivegateway')) return 'exclusive';
+  if (tagName.includes('parallelgateway')) return 'parallel';
+  if (tagName.includes('inclusivegateway')) return 'inclusive';
+  if (tagName.includes('eventbasedgateway')) return 'event-based';
+  if (tagName.includes('complexgateway')) return 'complex';
   return 'exclusive';
 }
 
@@ -318,6 +319,15 @@ export class BPMNService {
       const laneInfo = assignedLaneId ? lanes.get(assignedLaneId) : null;
       const poolId = laneInfo?.poolId;
       
+      // A node's parent can be a pool (via a lane) or another node (e.g., boundary events)
+      let parentNodeId: string | undefined = poolId;
+      if (tagName.includes('boundaryevent')) {
+        const attachedToRef = element.getAttribute('attachedToRef');
+        if (attachedToRef) {
+          parentNodeId = attachedToRef;
+        }
+      }
+      
       if (assignedLaneId) {
         console.log(`🎯 Element ${id} assigned to lane ${assignedLaneId} (${laneInfo?.name}) in pool ${poolId || 'none'}`);
       } else {
@@ -374,11 +384,15 @@ export class BPMNService {
           zIndex: 0,
         };
         
-        // Assign element to its pool if it has a lane
-        if (poolId) {
-          elementNode.parentNode = poolId;
-          elementNode.extent = 'parent'; // Constrain element within its pool
-          console.log(`🔗 Element ${id} assigned to parent pool ${poolId} via lane ${assignedLaneId}`);
+        // Assign element to its parent if it has one
+        if (parentNodeId) {
+          elementNode.parentNode = parentNodeId;
+          elementNode.extent = 'parent';
+          if (nodeData.eventType === 'boundary') {
+            console.log(`🔗 Boundary event ${id} attached to parent task ${parentNodeId}`);
+          } else {
+            console.log(`🔗 Element ${id} assigned to parent pool ${parentNodeId}`);
+          }
         }
         
         nodes.push(elementNode);
@@ -444,6 +458,28 @@ export class BPMNService {
           targetHandle,
           type: 'sequence-flow',
           data: edgeData,
+        });
+      }
+    });
+    
+    // Process data associations as edges
+    const dataAssociations = xmlDoc.querySelectorAll('dataInputAssociation, dataOutputAssociation');
+    console.log(`Found ${dataAssociations.length} data associations`);
+    dataAssociations.forEach((assoc, index) => {
+      const id = assoc.getAttribute('id') || `assoc_${index}`;
+      const sourceRef = assoc.querySelector('sourceRef')?.textContent?.trim();
+      const targetRef = assoc.querySelector('targetRef')?.textContent?.trim();
+
+      console.log(`Data Association ${index}: ${id}, ${sourceRef} -> ${targetRef}`);
+
+      if (sourceRef && targetRef) {
+        edges.push({
+          id,
+          source: sourceRef,
+          target: targetRef,
+          type: 'association',
+          markerEnd: { type: 'arrow' as const },
+          style: { strokeDasharray: '5 5' },
         });
       }
     });
