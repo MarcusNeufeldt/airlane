@@ -90,11 +90,13 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
     distributeSelectedNodes,
   } = useDiagramStore();
 
-  const { setCenter, getNode, zoomIn, zoomOut, fitView } = useReactFlow();
+  const { setCenter, getNode, zoomIn, zoomOut, fitView, screenToFlowPosition } = useReactFlow();
   const [alignmentToolbarPosition, setAlignmentToolbarPosition] = useState<{ x: number; y: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
+    x: number; // Screen coordinates for menu positioning
+    y: number; // Screen coordinates for menu positioning
+    flowX: number; // Flow coordinates for node positioning
+    flowY: number; // Flow coordinates for node positioning
     nodeId?: string;
     nodeType?: string;
   } | null>(null);
@@ -457,21 +459,34 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
   // Handle right-click context menu
   const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: any) => {
     event.preventDefault();
+    const flowPosition = screenToFlowPosition({
+      x: event.clientX,
+      y: event.clientY,
+    });
     setContextMenu({
       x: event.clientX,
       y: event.clientY,
+      flowX: flowPosition.x,
+      flowY: flowPosition.y,
       nodeId: node.id,
       nodeType: node.type,
     });
-  }, []);
+  }, [screenToFlowPosition]);
 
   const handlePaneContextMenu = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
-    setContextMenu({
+    // Convert screen coordinates to flow coordinates
+    const flowPosition = screenToFlowPosition({
       x: event.clientX,
       y: event.clientY,
     });
-  }, []);
+    setContextMenu({
+      x: event.clientX,        // Screen coordinates for menu positioning
+      y: event.clientY,        // Screen coordinates for menu positioning
+      flowX: flowPosition.x,   // Flow coordinates for node positioning
+      flowY: flowPosition.y,   // Flow coordinates for node positioning
+    });
+  }, [screenToFlowPosition]);
 
   // Context menu actions
   const handleContextMenuDelete = useCallback(() => {
@@ -509,7 +524,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
 
   const handleContextMenuAddNode = useCallback((type: string, direction: 'right' | 'down' | 'left' | 'up') => {
     if (contextMenu) {
-      let position = { x: contextMenu.x, y: contextMenu.y };
+      let position = { x: contextMenu.flowX, y: contextMenu.flowY }; // Use flow coordinates
       
       if (contextMenu.nodeId) {
         const node = nodes.find(n => n.id === contextMenu.nodeId);
