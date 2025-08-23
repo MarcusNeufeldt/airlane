@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { NodeProps, NodeResizer, Handle, Position } from 'reactflow';
-import { Building2, Users, Plus, Trash2, Split, ArrowUp, ArrowDown, Edit2 } from 'lucide-react';
+import { Building2, Users, Plus, Trash2, Split, ArrowUp, ArrowDown, Edit2, GripHorizontal } from 'lucide-react';
 import { useDiagramStore } from '../stores/diagramStore';
 
 export interface Lane {
@@ -32,7 +32,8 @@ const laneColors = [
 export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({ 
   id, 
   data, 
-  selected 
+  selected,
+  dragging
 }) => {
   const { updateNode, deleteNode } = useDiagramStore();
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -41,6 +42,7 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
   const [selectedLaneId, setSelectedLaneId] = useState<string | null>(null);
   const [editingLane, setEditingLane] = useState<string | null>(null);
   const [laneName, setLaneName] = useState('');
+  const [isResizing, setIsResizing] = useState(false);
 
   const handleResize = useCallback((_event: any, params: any) => {
     updateNode(id, { 
@@ -79,10 +81,8 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
       updatedLanes = [newLane, ...lanes];
     }
     
-    const newHeight = updatedLanes.reduce((sum, lane) => sum + lane.height, 60);
     updateNode(id, { 
-      lanes: updatedLanes,
-      height: newHeight
+      lanes: updatedLanes
     });
     setShowContextMenu(false);
   }, [data.lanes, id, updateNode]);
@@ -104,10 +104,8 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
       updatedLanes = [...lanes, newLane];
     }
     
-    const newHeight = updatedLanes.reduce((sum, lane) => sum + lane.height, 60);
     updateNode(id, { 
-      lanes: updatedLanes,
-      height: newHeight
+      lanes: updatedLanes
     });
     setShowContextMenu(false);
   }, [data.lanes, id, updateNode]);
@@ -145,14 +143,19 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
   }, [data.lanes, id, updateNode]);
 
   const removeLane = useCallback((laneId: string) => {
-    const updatedLanes = (data.lanes || []).filter(lane => lane.id !== laneId);
-    const newHeight = updatedLanes.length > 0 
-      ? updatedLanes.reduce((sum, lane) => sum + lane.height, 60)
-      : 200;
+    const currentLanes = data.lanes || [];
+    const updatedLanes = currentLanes.filter(lane => lane.id !== laneId);
+    
+    // If there are remaining lanes, distribute height evenly
+    if (updatedLanes.length > 0) {
+      const heightPerLane = 120; // Standard height per lane
+      updatedLanes.forEach(lane => {
+        lane.height = heightPerLane;
+      });
+    }
     
     updateNode(id, { 
-      lanes: updatedLanes,
-      height: newHeight
+      lanes: updatedLanes
     });
     setShowContextMenu(false);
     setSelectedLaneId(null);
@@ -194,6 +197,10 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
+  // Calculate lane heights
+  const totalLaneHeight = lanes.reduce((sum, l) => sum + l.height, 0);
+  const availableHeight = poolHeight - 4;
+
   return (
     <>
       <NodeResizer
@@ -211,6 +218,8 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
         style={{
           width: poolWidth,
           height: poolHeight,
+          // Prevent pointer events when resizing to avoid node dragging
+          pointerEvents: isResizing ? 'none' : 'auto'
         }}
         onContextMenu={(e) => handleContextMenu(e)}
       >
@@ -226,7 +235,7 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
         </div>
 
         {/* Lanes Container */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col overflow-hidden">
           {lanes.length === 0 ? (
             <div 
               className="flex-1 flex items-center justify-center text-gray-400"
@@ -245,11 +254,10 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
             </div>
           ) : (
             lanes.map((lane, index) => {
-              let laneActualHeight = lane.height;
               // Calculate actual height as proportion of available space
-              const totalLaneHeight = lanes.reduce((sum, l) => sum + l.height, 0);
-              const availableHeight = poolHeight - 4; // Small padding
-              laneActualHeight = (lane.height / totalLaneHeight) * availableHeight;
+              const laneActualHeight = totalLaneHeight > 0 
+                ? (lane.height / totalLaneHeight) * availableHeight
+                : availableHeight / lanes.length;
 
               const isSelected = selectedLaneId === lane.id;
 
@@ -262,7 +270,8 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
                   style={{ 
                     backgroundColor: lane.color,
                     height: `${laneActualHeight}px`,
-                    minHeight: '60px'
+                    minHeight: '60px',
+                    flexShrink: 0
                   }}
                   onClick={(e) => handleLaneClick(e, lane.id)}
                   onContextMenu={(e) => handleContextMenu(e, lane.id)}
@@ -343,68 +352,71 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
                     )}
                   </div>
 
-                  {/* Lane Resize Handle - Now with better drag handling */}
+                  {/* Lane Resize Handle */}
                   {index < lanes.length - 1 && (
                     <div
-                      className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize flex items-center justify-center z-30"
-                      style={{
-                        background: 'linear-gradient(to bottom, transparent, rgba(156, 163, 175, 0.3))'
+                      className="lane-resize-handle absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center hover:bg-gray-300/30 transition-colors"
+                      style={{ 
+                        zIndex: 50,
+                        pointerEvents: dragging ? 'none' : 'auto'
                       }}
                       onMouseDown={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        
-                        // Prevent node dragging
-                        const nodeElement = (e.target as HTMLElement).closest('.react-flow__node') as HTMLElement;
-                        if (nodeElement) {
-                          nodeElement.style.pointerEvents = 'none';
-                        }
+                        setIsResizing(true);
                         
                         const startY = e.clientY;
                         const startHeight = lane.height;
                         const nextLane = lanes[index + 1];
                         const nextStartHeight = nextLane.height;
                         
-                        const handleMouseMove = (e: MouseEvent) => {
-                          e.preventDefault();
-                          e.stopPropagation();
+                        const handleMouseMove = (moveEvent: MouseEvent) => {
+                          moveEvent.preventDefault();
+                          moveEvent.stopPropagation();
                           
-                          const deltaY = e.clientY - startY;
+                          const deltaY = moveEvent.clientY - startY;
+                          // Scale the delta based on the ratio
                           const scaleFactor = totalLaneHeight / availableHeight;
                           const adjustedDelta = deltaY * scaleFactor;
                           
-                          const newHeight = startHeight + adjustedDelta;
-                          const newNextHeight = nextStartHeight - adjustedDelta;
+                          const newHeight = Math.max(60, startHeight + adjustedDelta);
+                          const newNextHeight = Math.max(60, nextStartHeight - adjustedDelta);
                           
+                          // Only update if both heights are valid
                           if (newHeight >= 60 && newNextHeight >= 60) {
-                            const updatedLanes = lanes.map((l, i) => {
-                              if (i === index) return { ...l, height: newHeight };
-                              if (i === index + 1) return { ...l, height: newNextHeight };
-                              return l;
-                            });
+                            const totalNewHeight = newHeight + newNextHeight;
+                            const totalOrigHeight = startHeight + nextStartHeight;
                             
-                            updateNode(id, { lanes: updatedLanes });
+                            // Maintain the total height
+                            if (Math.abs(totalNewHeight - totalOrigHeight) < 1) {
+                              const updatedLanes = lanes.map((l, i) => {
+                                if (i === index) return { ...l, height: newHeight };
+                                if (i === index + 1) return { ...l, height: newNextHeight };
+                                return l;
+                              });
+                              
+                              updateNode(id, { lanes: updatedLanes });
+                            }
                           }
                         };
                         
-                        const handleMouseUp = (e: MouseEvent) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          
-                          // Re-enable node dragging
-                          if (nodeElement) {
-                            nodeElement.style.pointerEvents = '';
-                          }
-                          
+                        const handleMouseUp = () => {
+                          setIsResizing(false);
                           document.removeEventListener('mousemove', handleMouseMove);
                           document.removeEventListener('mouseup', handleMouseUp);
+                          // Allow some time for the state to update
+                          setTimeout(() => {
+                            document.body.style.userSelect = '';
+                          }, 0);
                         };
                         
+                        // Prevent text selection during drag
+                        document.body.style.userSelect = 'none';
                         document.addEventListener('mousemove', handleMouseMove);
                         document.addEventListener('mouseup', handleMouseUp);
                       }}
                     >
-                      <div className="bg-gray-400 h-0.5 w-8 rounded" />
+                      <GripHorizontal size={16} className="text-gray-400" />
                     </div>
                   )}
                 </div>
@@ -418,25 +430,25 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
           type="target"
           position={Position.Left}
           id="input-left"
-          style={{ left: -8 }}
+          style={{ left: -8, pointerEvents: 'auto' }}
         />
         <Handle
           type="source"
           position={Position.Right}
           id="output-right"
-          style={{ right: -8 }}
+          style={{ right: -8, pointerEvents: 'auto' }}
         />
         <Handle
           type="target"
           position={Position.Top}
           id="input-top"
-          style={{ top: -8 }}
+          style={{ top: -8, pointerEvents: 'auto' }}
         />
         <Handle
           type="source"
           position={Position.Bottom}
           id="output-bottom"
-          style={{ bottom: -8 }}
+          style={{ bottom: -8, pointerEvents: 'auto' }}
         />
       </div>
 
