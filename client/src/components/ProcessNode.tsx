@@ -10,6 +10,12 @@ import {
   ArrowDownToLine,
   PenTool,
   PlusSquare,
+  Cog,
+  Hand,
+  Code,
+  Calculator,
+  Download,
+  MoreHorizontal,
 } from 'lucide-react';
 
 export const ProcessNode: React.FC<NodeProps<ProcessNodeData>> = ({ id, data, selected }) => {
