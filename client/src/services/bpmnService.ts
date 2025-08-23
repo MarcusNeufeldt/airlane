@@ -461,7 +461,7 @@ export class BPMNService {
           const eventData = sourceNode.data as any;
           if (eventData.eventType === 'start') {
             sourceHandle = 'start-right';
-          } else if (eventData.eventType === 'intermediate') {
+          } else if (eventData.eventType === 'intermediate' || eventData.eventType === 'boundary') {
             sourceHandle = 'inter-output';
           }
         }
@@ -470,7 +470,7 @@ export class BPMNService {
           const eventData = targetNode.data as any;
           if (eventData.eventType === 'end') {
             targetHandle = 'end-left';
-          } else if (eventData.eventType === 'intermediate') {
+          } else if (eventData.eventType === 'intermediate' || eventData.eventType === 'boundary') {
             targetHandle = 'inter-input';
           }
         }
