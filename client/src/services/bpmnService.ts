@@ -484,15 +484,17 @@ export class BPMNService {
       if (tagName.includes('datainputassociation')) {
         const targetElement = targetRef ? xmlDoc.querySelector(`[id="${targetRef}"]`) : null;
         const parentTask = targetElement?.closest('task, serviceTask, userTask, businessRuleTask, scriptTask, sendTask, receiveTask, manualTask');
-        if (parentTask && parentTask.getAttribute('id')) {
-          finalTarget = parentTask.getAttribute('id');
+        const parentTaskId = parentTask?.getAttribute('id');
+        if (parentTaskId) {
+          finalTarget = parentTaskId;
           console.log(`Remapped dataInputAssociation target from ${targetRef} to task ${finalTarget}`);
         }
       } else if (tagName.includes('dataoutputassociation')) {
         const sourceElement = sourceRef ? xmlDoc.querySelector(`[id="${sourceRef}"]`) : null;
         const parentTask = sourceElement?.closest('task, serviceTask, userTask, businessRuleTask, scriptTask, sendTask, receiveTask, manualTask');
-        if (parentTask && parentTask.getAttribute('id')) {
-          finalSource = parentTask.getAttribute('id');
+        const parentTaskId = parentTask?.getAttribute('id');
+        if (parentTaskId) {
+          finalSource = parentTaskId;
           console.log(`Remapped dataOutputAssociation source from ${sourceRef} to task ${finalSource}`);
         }
       }
