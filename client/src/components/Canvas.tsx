@@ -32,6 +32,7 @@ import { CanvasSearch } from './CanvasSearch';
 import { AlignmentToolbar } from './AlignmentToolbar';
 import { ZoomToolbar } from './ZoomToolbar';
 import { ProcessContextMenu } from './ProcessContextMenu';
+import { QuickNodeSelector } from './QuickNodeSelector';
 
 const nodeTypes: NodeTypes = {
   process: ProcessNode,
@@ -99,6 +100,12 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
     flowY: number; // Flow coordinates for node positioning
     nodeId?: string;
     nodeType?: string;
+  } | null>(null);
+  
+  const [quickNodeSelector, setQuickNodeSelector] = useState<{
+    x: number;
+    y: number;
+    sourceNodeId: string;
   } | null>(null);
   
   // Sort nodes by z-index to ensure proper layering
@@ -453,6 +460,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
     selectNode(null);
     setContextMenuNode(null);
     setContextMenu(null);
+    setQuickNodeSelector(null);
     closeAllDropdowns();
   }, [selectNode, setContextMenuNode, closeAllDropdowns]);
 
@@ -551,6 +559,211 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
     }
     setContextMenu(null);
   }, [contextMenu, nodes, addNode]);
+
+  // Handle node click for quick selector
+  const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    // Only show quick selector for process nodes, events, and gateways
+    const allowedTypes = ['process', 'event', 'gateway'];
+    if (!node.type || !allowedTypes.includes(node.type)) {
+      return;
+    }
+
+    // Don't show if context menu is open or if this is a right-click
+    if (contextMenu || event.button === 2) {
+      return;
+    }
+
+    event.stopPropagation();
+    
+    // Calculate position near the node
+    const nodeElement = event.currentTarget as HTMLElement;
+    const rect = nodeElement.getBoundingClientRect();
+    
+    setQuickNodeSelector({
+      x: rect.right + 10, // Position to the right of the node
+      y: rect.top,
+      sourceNodeId: node.id
+    });
+  }, [contextMenu]);
+
+  // Handle quick node selector actions
+  const handleQuickNodeSelect = useCallback((nodeType: string, direction: 'right' | 'down' | 'left' | 'up', eventType?: string) => {
+    if (!quickNodeSelector) return;
+
+    const sourceNode = nodes.find(n => n.id === quickNodeSelector.sourceNodeId);
+    if (!sourceNode) return;
+
+    // Calculate position based on direction
+    // Use larger offset and account for node sizes
+    const offset = 200; // Increased offset for better spacing
+    const nodeWidth = 150; // Approximate node width
+    const nodeHeight = 80; // Approximate node height
+    
+    let position = { x: sourceNode.position.x, y: sourceNode.position.y };
+    
+    switch (direction) {
+      case 'right':
+        position.x += nodeWidth + 50; // Node width plus gap
+        break;
+      case 'down':
+        position.y += nodeHeight + 50; // Node height plus gap
+        break;
+      case 'left':
+        position.x -= nodeWidth + 50; // Node width plus gap
+        break;
+      case 'up':
+        position.y -= nodeHeight + 50; // Node height plus gap
+        break;
+    }
+
+    // Create the node with appropriate options
+    let options = {};
+    if (nodeType === 'event' && eventType) {
+      options = { eventType };
+    }
+
+    // Store connection info before creating node
+    const sourceNodeId = quickNodeSelector.sourceNodeId;
+    const currentDirection = direction; // Capture direction for closure
+    
+    // Create the new node - the store will generate the ID
+    addNode(nodeType as any, position, options);
+
+    // Create automatic connection between source and new node
+    // We'll find the most recently created node as the target
+    setTimeout(() => {
+      // Get updated nodes from the store - find the newest node
+      const allNodes = useDiagramStore.getState().nodes;
+      
+      // Find the most recently created node (highest timestamp in ID)
+      const newNode = allNodes
+        .filter(node => node.id !== sourceNodeId) // Exclude source node
+        .sort((a, b) => {
+          // Extract timestamp from node ID (format: "type-timestamp")
+          const aTime = parseInt(a.id.split('-').pop() || '0');
+          const bTime = parseInt(b.id.split('-').pop() || '0');
+          return bTime - aTime; // Sort by newest first
+        })[0]; // Get the newest node
+      
+      console.log('All nodes:', allNodes.map(n => ({ id: n.id, pos: n.position })));
+      console.log('Looking for new node at position:', position);
+      console.log('Selected newest node:', newNode);
+      
+      if (newNode) {
+        // Determine the correct source and target handles based on direction and node types
+        let sourceHandle: string;
+        let targetHandle: string;
+        
+        // Get source node to determine its handle IDs
+        const currentSourceNode = allNodes.find(n => n.id === sourceNodeId);
+        
+        // Source handle logic (from the clicked node)
+        if (currentSourceNode?.type === 'event') {
+          const eventData = currentSourceNode.data as any;
+          if (eventData.eventType === 'start') {
+            sourceHandle = currentDirection === 'right' ? 'start-right' : 'start-bottom';
+          } else {
+            // For intermediate/end events, use generic handles if they exist
+            sourceHandle = currentDirection === 'right' ? 'output-right' : 
+                          currentDirection === 'down' ? 'output-bottom' : 
+                          currentDirection === 'left' ? 'output-left' : 'output-top';
+          }
+        } else {
+          // For process/gateway nodes
+          switch (currentDirection) {
+            case 'right':
+              sourceHandle = 'output-right';
+              break;
+            case 'down':
+              sourceHandle = 'output-bottom';
+              break;
+            case 'left':
+              sourceHandle = 'output-left';
+              break;
+            case 'up':
+              sourceHandle = 'output-top';
+              break;
+            default:
+              sourceHandle = 'output-right';
+          }
+        }
+        
+        // Target handle logic (for the new node)
+        if (newNode.type === 'event') {
+          const newEventData = newNode.data as any;
+          if (newEventData.eventType === 'end') {
+            targetHandle = currentDirection === 'right' ? 'end-left' : 'end-top';
+          } else {
+            // For start/intermediate events
+            targetHandle = currentDirection === 'right' ? 'input-left' : 
+                          currentDirection === 'down' ? 'input-top' : 
+                          currentDirection === 'left' ? 'input-right' : 'input-bottom';
+          }
+        } else if (newNode.type === 'data-object') {
+          // Data objects use association handles
+          switch (currentDirection) {
+            case 'right':
+              targetHandle = 'association-left';
+              break;
+            case 'down':
+              targetHandle = 'association-top';
+              break;
+            case 'left':
+              targetHandle = 'association-right';
+              break;
+            case 'up':
+              targetHandle = 'association-bottom';
+              break;
+            default:
+              targetHandle = 'association-left';
+          }
+        } else {
+          // For process/gateway nodes
+          switch (currentDirection) {
+            case 'right':
+              targetHandle = 'input-left';
+              break;
+            case 'down':
+              targetHandle = 'input-top';
+              break;
+            case 'left':
+              targetHandle = 'input-right';
+              break;
+            case 'up':
+              targetHandle = 'input-bottom';
+              break;
+            default:
+              targetHandle = 'input-left';
+          }
+        }
+        
+        const newEdge = {
+          id: `edge-${Date.now()}`,
+          source: sourceNodeId,
+          target: newNode.id,
+          sourceHandle: null, // Let React Flow auto-connect for now
+          targetHandle: null,  // Let React Flow auto-connect for now
+          type: 'sequence-flow',
+          markerEnd: { type: 'arrowclosed' as const },
+        };
+        
+        console.log('Creating edge with handles:', { 
+          sourceHandle, 
+          targetHandle, 
+          direction: currentDirection,
+          sourceNodeType: currentSourceNode?.type,
+          targetNodeType: newNode.type,
+          sourceId: sourceNodeId,
+          targetId: newNode.id
+        });
+        
+        // Add the edge using the store's onConnect method
+        onConnect(newEdge);
+      }
+    }, 100); // Small delay to ensure node is created first
+
+    setQuickNodeSelector(null);
+  }, [quickNodeSelector, nodes, addNode, onConnect]);
   
   // Handle selection changes from ReactFlow
   const handleSelectionChange = useCallback((params: any) => {
@@ -580,6 +793,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
         onPaneClick={handlePaneClick}
         onPaneContextMenu={handlePaneContextMenu}
         onNodeContextMenu={handleNodeContextMenu}
+        onNodeClick={handleNodeClick}
         onSelectionChange={handleSelectionChange}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
@@ -653,6 +867,17 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
           onDuplicate={handleContextMenuDuplicate}
           onProperties={handleContextMenuProperties}
           onAddNode={handleContextMenuAddNode}
+        />
+      )}
+
+      {/* Quick Node Selector */}
+      {quickNodeSelector && (
+        <QuickNodeSelector
+          x={quickNodeSelector.x}
+          y={quickNodeSelector.y}
+          sourceNodeId={quickNodeSelector.sourceNodeId}
+          onSelectNode={handleQuickNodeSelect}
+          onClose={() => setQuickNodeSelector(null)}
         />
       )}
     </div>
