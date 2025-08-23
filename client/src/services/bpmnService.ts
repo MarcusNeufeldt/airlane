@@ -1,4 +1,4 @@
-import { Node, Edge } from 'reactflow';
+import { Node, Edge, MarkerType } from 'reactflow';
 
 // BPMN Element type mappings
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -478,7 +478,7 @@ export class BPMNService {
           source: sourceRef,
           target: targetRef,
           type: 'association',
-          markerEnd: { type: 'arrow' as const },
+          markerEnd: { type: MarkerType.ArrowClosed },
           style: { strokeDasharray: '5 5' },
         });
       }
