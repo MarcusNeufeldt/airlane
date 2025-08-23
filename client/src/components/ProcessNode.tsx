@@ -204,30 +204,14 @@ export const ProcessNode: React.FC<NodeProps<ProcessNodeData>> = ({ id, data, se
             {data.performer || 'Unassigned'}
           </div>
         )}
-
-        {/* Subprocess indicator */}
-        {data.processType === 'subprocess' && (
-          <div className="absolute bottom-1 right-1">
-            {nodeStyles.icon}
-          </div>
-        )}
-        
-        {/* Editable label */}
-        {isEditing ? (
-            <input
-              value={label}
-              onChange={handleLabelChange}
-              onBlur={handleLabelBlur}
-              onKeyDown={handleKeyDown}
-              className="w-full text-center text-sm bg-transparent border-b border-blue-400 outline-none font-medium"
-              autoFocus
-            />
-          ) : (
-            <span className="text-center text-sm font-medium text-gray-800 leading-tight">
-              {data.label}
-            </span>
-          )}
-      </div>
-    </div>
-  );
-};
+ 
+         {/* Subprocess indicator */}
+         {data.processType === 'subprocess' && (
+           <div className="absolute bottom-1 right-1">
+             {nodeStyles.icon}
+           </div>
+         )}
+       </div>
+     </div>
+   );
+ };
