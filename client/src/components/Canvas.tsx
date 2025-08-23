@@ -562,14 +562,19 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
 
   // Handle node click for quick selector
   const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    // Only show quick selector for process nodes, events, and gateways
-    const allowedTypes = ['process', 'event', 'gateway'];
+    // Only show quick selector for process nodes, events, gateways, and data objects
+    const allowedTypes = ['process', 'event', 'gateway', 'data-object'];
     if (!node.type || !allowedTypes.includes(node.type)) {
       return;
     }
 
     // Don't show if context menu is open or if this is a right-click
     if (contextMenu || event.button === 2) {
+      return;
+    }
+
+    // Don't show if Ctrl/Cmd is held (multi-selection mode)
+    if (event.ctrlKey || event.metaKey) {
       return;
     }
 
@@ -620,6 +625,9 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
     let options = {};
     if (nodeType === 'event' && eventType) {
       options = { eventType };
+    } else if (nodeType === 'data-object' && eventType) {
+      // For data objects, eventType is actually the dataType
+      options = { dataType: eventType };
     }
 
     // Store connection info before creating node

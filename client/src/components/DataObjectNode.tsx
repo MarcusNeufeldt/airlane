@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { DataObjectNodeData } from '../types';
 import { useDiagramStore } from '../stores/diagramStore';
-import { FileText, Database, Archive } from 'lucide-react';
+import { FileText, Database, Archive, HardDrive, Link2 } from 'lucide-react';
 
 export const DataObjectNode: React.FC<NodeProps<DataObjectNodeData>> = ({ id, data, selected }) => {
   const { updateNode } = useDiagramStore();
@@ -70,10 +70,15 @@ export const DataObjectNode: React.FC<NodeProps<DataObjectNodeData>> = ({ id, da
       >
         {/* Icon */}
         <div className="mb-1">
-          {data.dataObjectType === 'data-store' 
-            ? <Database className="w-8 h-8 text-gray-700" /> 
-            : <FileText className="w-8 h-8 text-gray-700" />
-          }
+          {data.dataObjectType === 'data-store' ? (
+            <Database className="w-8 h-8 text-gray-700" />
+          ) : data.dataType === 'storage' ? (
+            <HardDrive className="w-8 h-8 text-gray-700" />
+          ) : data.dataType === 'reference' ? (
+            <Link2 className="w-8 h-8 text-gray-700" />
+          ) : (
+            <FileText className="w-8 h-8 text-gray-700" />
+          )}
         </div>
         
         {/* Label */}

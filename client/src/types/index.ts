@@ -4,7 +4,7 @@ export type ProcessType = 'task' | 'subprocess';
 export type TaskType = 'user' | 'service' | 'manual' | 'script' | 'business-rule' | 'send' | 'receive';
 export type GatewayType = 'exclusive' | 'parallel' | 'inclusive' | 'event-based' | 'complex';
 export type EdgeType = 'sequence-flow' | 'message-flow' | 'association';
-export type DataObjectType = 'input' | 'output' | 'collection';
+export type DataObjectType = 'input' | 'output' | 'collection' | 'storage' | 'reference';
 
 // Base interface for all node data
 export interface BaseNodeData {

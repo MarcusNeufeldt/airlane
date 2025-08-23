@@ -352,8 +352,10 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
           const dataObjectData: DataObjectNodeData = { 
             id, 
             nodeType: 'data-object', 
-            dataType: 'input',
-            label: 'Data Object'
+            dataType: options.dataType || 'input',
+            label: options.dataType === 'storage' ? 'Storage' : 
+                   options.dataType === 'reference' ? 'Reference' : 
+                   options.dataType === 'collection' ? 'Collection' : 'Data Object'
           };
           newNode = { id, type, position: snappedPosition, data: dataObjectData };
           break;

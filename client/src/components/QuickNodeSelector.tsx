@@ -5,7 +5,10 @@ import {
   StopCircle, 
   GitBranch, 
   Database,
-  Clock
+  Clock,
+  FileText,
+  HardDrive,
+  Link2
 } from 'lucide-react';
 
 interface QuickNodeSelectorProps {
@@ -22,7 +25,9 @@ const nodeTypes = [
   { type: 'event', subType: 'end', icon: StopCircle, label: 'End', color: 'bg-red-100 hover:bg-red-200 text-red-800' },
   { type: 'gateway', icon: GitBranch, label: 'Gateway', color: 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800' },
   { type: 'event', subType: 'intermediate', icon: Clock, label: 'Timer', color: 'bg-purple-100 hover:bg-purple-200 text-purple-800' },
-  { type: 'data-object', icon: Database, label: 'Data', color: 'bg-gray-100 hover:bg-gray-200 text-gray-800' },
+  { type: 'data-object', subType: 'input', icon: FileText, label: 'Data', color: 'bg-gray-100 hover:bg-gray-200 text-gray-800' },
+  { type: 'data-object', subType: 'storage', icon: HardDrive, label: 'Storage', color: 'bg-slate-100 hover:bg-slate-200 text-slate-800' },
+  { type: 'data-object', subType: 'reference', icon: Link2, label: 'Reference', color: 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800' },
 ];
 
 export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
@@ -173,7 +178,7 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
         </div>
 
         {/* Node Type Grid */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto">
           {nodeTypes.map(({ type, subType, icon: Icon, label, color }) => (
             <button
               key={`${type}-${subType || 'default'}`}
