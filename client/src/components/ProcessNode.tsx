@@ -2,7 +2,15 @@ import React, { useState } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { ProcessNodeData } from '../types';
 import { useDiagramStore } from '../stores/diagramStore';
-import { Settings, MoreHorizontal, User, Cog, Hand, Code, Calculator, Send, Download } from 'lucide-react';
+import {
+  User,
+  Settings,
+  Book,
+  Send,
+  ArrowDownToLine,
+  PenTool,
+  PlusSquare,
+} from 'lucide-react';
 
 export const ProcessNode: React.FC<NodeProps<ProcessNodeData>> = ({ id, data, selected }) => {
   const { updateNode, showLaneColors, simulationActiveNodes, isSimulating, animatingNodeIds } = useDiagramStore();
@@ -53,6 +61,36 @@ export const ProcessNode: React.FC<NodeProps<ProcessNodeData>> = ({ id, data, se
         return null;
     }
   };
+
+  const getNodeStyles = () => {
+    // Base styles for all process nodes
+    let styles = {
+      icon: null,
+      bgColor: 'bg-white',
+      borderColor: 'border-gray-300',
+      borderStyle: 'border-solid',
+    };
+
+    // Specific styles for different process types
+    switch (data.processType) {
+      case 'subprocess':
+        return {
+          icon: <PlusSquare className="w-4 h-4 text-gray-600" />,
+          bgColor: 'bg-gray-100',
+          borderColor: 'border-gray-400',
+          borderStyle: 'border-dashed',
+        };
+      default:
+        return {
+          icon: <User className="w-4 h-4 text-blue-600" />, // Default to user task
+          bgColor: 'bg-blue-100',
+          borderColor: 'border-blue-400',
+          borderStyle: 'border-solid',
+        };
+    }
+  };
+
+  const nodeStyles = getNodeStyles();
 
   return (
     <div className="relative">
@@ -160,6 +198,29 @@ export const ProcessNode: React.FC<NodeProps<ProcessNodeData>> = ({ id, data, se
             {data.performer || 'Unassigned'}
           </div>
         )}
+
+        {/* Subprocess indicator */}
+        {data.processType === 'subprocess' && (
+          <div className="absolute bottom-1 right-1">
+            {nodeStyles.icon}
+          </div>
+        )}
+        
+        {/* Editable label */}
+        {isEditing ? (
+            <input
+              value={label}
+              onChange={handleLabelChange}
+              onBlur={handleLabelBlur}
+              onKeyDown={handleKeyDown}
+              className="w-full text-center text-sm bg-transparent border-b border-blue-400 outline-none font-medium"
+              autoFocus
+            />
+          ) : (
+            <span className="text-center text-sm font-medium text-gray-800 leading-tight">
+              {data.label}
+            </span>
+          )}
       </div>
     </div>
   );

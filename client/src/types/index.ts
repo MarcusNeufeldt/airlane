@@ -22,7 +22,7 @@ export interface BaseNodeData {
 export interface EventNodeData extends BaseNodeData {
   nodeType: 'event';
   eventType: EventType;
-  eventSubType?: 'error' | 'timer' | 'message';
+  eventSubType?: 'error' | 'timer' | 'message' | 'escalation';
 }
 
 export interface ProcessNodeData extends BaseNodeData {

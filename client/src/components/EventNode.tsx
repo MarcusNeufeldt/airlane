@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { EventNodeData } from '../types';
 import { useDiagramStore } from '../stores/diagramStore';
-import { Play, Square, Circle, Zap, Timer, MessageSquare } from 'lucide-react';
+import { Play, Square, Circle, Zap, Timer, MessageSquare, ArrowUpCircle } from 'lucide-react';
 
 export const EventNode: React.FC<NodeProps<EventNodeData>> = ({ id, data, selected }) => {
   const { updateNode, showLaneColors, simulationActiveNodes, isSimulating, animatingNodeIds } = useDiagramStore();
@@ -37,6 +37,8 @@ export const EventNode: React.FC<NodeProps<EventNodeData>> = ({ id, data, select
         return <Timer className="w-4 h-4 text-indigo-600" />;
       case 'message':
         return <MessageSquare className="w-4 h-4 text-blue-600" />;
+      case 'escalation':
+        return <ArrowUpCircle className="w-4 h-4 text-purple-600" />;
       default:
         return null;
     }

@@ -317,13 +317,8 @@ export class BPMNService {
       const positionData = shapePositions.get(id)!; // We know it exists because we are iterating its keys
       const position = { x: positionData.x, y: positionData.y };
       
-      // Check if element is assigned to a lane
-      const assignedLaneId = elementLaneMap.get(id);
-      const laneInfo = assignedLaneId ? lanes.get(assignedLaneId) : null;
-      const poolId = laneInfo?.poolId;
-      
       // A node's parent can be a pool (via a lane), another node (e.g., boundary events), or a sub-process
-      let parentNodeId: string | undefined = poolId;
+      let parentNodeId: string | undefined = null;
       const parentSubProcess = element.closest('subProcess');
 
       if (parentSubProcess) {
@@ -338,6 +333,15 @@ export class BPMNService {
         const attachedToRef = element.getAttribute('attachedToRef');
         if (attachedToRef) {
           parentNodeId = attachedToRef;
+        }
+      }
+
+      // If a node has a parent, its position must be made relative to the parent
+      if (parentNodeId) {
+        const parentPosition = shapePositions.get(parentNodeId);
+        if (parentPosition) {
+          position.x -= parentPosition.x;
+          position.y -= parentPosition.y;
         }
       }
       
@@ -361,6 +365,8 @@ export class BPMNService {
           nodeData.eventSubType = 'timer';
         } else if (element.querySelector('errorEventDefinition')) {
           nodeData.eventSubType = 'error';
+        } else if (element.querySelector('escalationEventDefinition')) {
+          nodeData.eventSubType = 'escalation';
         }
       } else if (tagName.includes('task')) {
         nodeType = 'process';
