@@ -79,7 +79,7 @@ class AIService {
               id: { type: "string", description: "Unique element identifier" },
               type: { 
                 type: "string", 
-                enum: ["process", "event", "gateway", "lane", "pool", "data-object"],
+                enum: ["process", "event", "gateway", "lane", "pool", "pool-with-lanes", "data-object"],
                 description: "BPMN element type" 
               },
               label: { type: "string", description: "Element label or name" },
@@ -104,7 +104,23 @@ class AIService {
                   participant: { type: "string", description: "Pool participant name" },
                   assignee: { type: "string", description: "Lane assignee" },
                   performer: { type: "string", description: "Process performer" },
-                  state: { type: "string", description: "Data object state" }
+                  state: { type: "string", description: "Data object state" },
+                  lanes: { 
+                    type: "array", 
+                    description: "Array of lanes for pool-with-lanes type",
+                    items: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string", description: "Lane identifier" },
+                        name: { type: "string", description: "Lane name" },
+                        height: { type: "number", description: "Lane height in pixels" },
+                        color: { type: "string", description: "Lane background color" }
+                      },
+                      required: ["id", "name", "height", "color"]
+                    }
+                  },
+                  width: { type: "number", description: "Element width in pixels" },
+                  height: { type: "number", description: "Element height in pixels" }
                 }
               }
             },
@@ -154,9 +170,11 @@ When generating processes:
 - Use appropriate task types (user, service, manual, script, business-rule, send, receive)
 - Connect elements with sequence flows to create logical process paths
 - Use gateways for decision points and parallel activities
-- Organize related activities in lanes by role or department
-- Use pools to separate different participants or organizations
-- Position elements logically from left to right following process flow
+- For processes with multiple roles/departments, use "pool-with-lanes" type instead of separate "lane" and "pool" elements
+- The "pool-with-lanes" element should include a lanes array with lane objects containing id, name, height, and color
+- Assign tasks to specific lanes using the "assignee" property to match the lane name
+- Position elements logically from left to right following process flow  
+- Use standard lane colors like #f5f5f5, #e3f2fd, #e8eaf6, #e0f2f1, #f1f8e9, #fffde7
 
 Respond ONLY with valid JSON matching the required BPMN process format. Do not include any explanations or additional text.`;
   }
@@ -300,14 +318,22 @@ Respond ONLY with valid JSON matching the required BPMN process format. Do not i
   // Chat with AI about the process (with function calling)
   async chatAboutProcess(userMessage, currentProcess = null, conversationHistory = [], images = []) {
     try {
+      console.log('🔍 AI Service Debug - images parameter:', images);
+      console.log('🔍 AI Service Debug - images type:', typeof images);
+      console.log('🔍 AI Service Debug - images length:', images ? images.length : 'undefined');
+      
       // Check if any previous messages mention images
       const conversationMentionsImages = conversationHistory.some(msg => 
         msg.content && msg.content.includes('[User attached') && msg.content.includes('image(s)]')
       );
       
+      console.log('🔍 AI Service Debug - conversationMentionsImages:', conversationMentionsImages);
+      
       const systemPrompt = `You are an expert AI assistant embedded within a **visual, web-based BPMN process modeling tool**. Your name is "Process Modeler AI".
 
 Your primary role is to help users design and modify business processes by interacting with a visual canvas.${(images && images.length > 0) || conversationMentionsImages ? ' You have vision capabilities and can analyze images. You may have already analyzed images in this conversation.' : ''}
+
+**IMPORTANT:** Only mention image analysis if you are actually processing images. If the user provides text instructions, respond as if you are processing text-based requirements, not analyzing any visual content.
 
 **Key Concepts of Your Environment:**
 - The user is looking at an interactive **canvas**.

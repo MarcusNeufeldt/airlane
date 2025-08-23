@@ -1086,15 +1086,19 @@ module.exports = async (req, res) => {
     if (method === 'POST' && url.includes('/diagram-chat')) {
       const urlParams = new URLSearchParams(url.split('?')[1] || '');
       const diagramId = urlParams.get('id');
-      const { message, currentProcess, images } = body;
-      
-      if (!diagramId) {
-        return res.status(400).json({ error: 'Diagram ID is required as query parameter' });
-      }
-      
-      if ((!message || !message.trim()) && (!images || images.length === 0)) {
-        return res.status(400).json({ error: 'Message or images are required' });
-      }
+              const { message, currentProcess, images } = body;
+        
+        console.log('🔍 Debug - images parameter:', images);
+        console.log('🔍 Debug - images type:', typeof images);
+        console.log('🔍 Debug - images length:', images ? images.length : 'undefined');
+        
+        if (!diagramId) {
+          return res.status(400).json({ error: 'Diagram ID is required as query parameter' });
+        }
+        
+        if ((!message || !message.trim()) && (!images || images.length === 0)) {
+          return res.status(400).json({ error: 'Message or images are required' });
+        }
       
       const client = createDbClient();
       
@@ -1169,7 +1173,7 @@ module.exports = async (req, res) => {
             console.log('✅ Generated process elements count:', process?.elements?.length || 0);
             // Include more context about what was created
             const elementNames = process?.elements?.map(e => e.label).join(', ') || '';
-            responseContent = `I've successfully analyzed your image and generated a business process based on what I saw. The process includes ${process?.elements?.length || 0} elements: ${elementNames}. This was created from the image you provided showing ${args.description}.`;
+            responseContent = `I've successfully generated a business process based on your request. The process includes ${process?.elements?.length || 0} elements: ${elementNames}.`;
             finalResponse = { process, content: responseContent };
           } else if (toolCall.function.name === 'modify_existing_process') {
             console.log('🔄 Executing process modification (non-destructive)');

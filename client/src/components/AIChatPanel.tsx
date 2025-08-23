@@ -241,6 +241,27 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
       
       const newNodes = processModel.elements.map((element) => {
         const optimalPos = optimalPositions.get(element.id) || element.position;
+        
+        // Handle pool-with-lanes type specially
+        if (element.type === 'pool-with-lanes') {
+          return {
+            id: element.id,
+            type: 'pool-with-lanes' as any,
+            position: optimalPos,
+            data: {
+              id: element.id,
+              nodeType: 'pool-with-lanes' as const,
+              label: element.label,
+              description: element.description,
+              participant: element.properties?.participant || element.label,
+              lanes: element.properties?.lanes || [],
+              width: element.properties?.width || 600,
+              height: element.properties?.height || 300,
+              ...element.properties
+            },
+          };
+        }
+        
         return {
           id: element.id,
           type: element.type as any,
@@ -436,7 +457,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
       console.log('📍 Diagram ID:', currentDiagramId);
       console.log('🖼️ Images attached:', currentImages.length);
 
-      const imageDataUrls = await Promise.all(currentImages.map(img => convertImageToBase64(img.file)));
+      const imageDataUrls = currentImages.length > 0 ? await Promise.all(currentImages.map(img => convertImageToBase64(img.file))) : undefined;
 
       // This is the key change: use the stateful endpoint
       const response = await aiService.postChatMessage(currentDiagramId, currentInput, currentProcess, imageDataUrls);

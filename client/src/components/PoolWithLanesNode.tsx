@@ -82,35 +82,40 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
     }
     
     console.log('Adding lane above, updated lanes:', updatedLanes);
+    // Force a proper update to ensure React re-renders
     updateNode(id, { 
-      lanes: updatedLanes
+      lanes: updatedLanes,
+      height: data.height // Ensure we maintain other properties
     });
     setShowContextMenu(false);
   }, [data.lanes, id, updateNode]);
 
   const addLaneBelow = useCallback((targetLaneId?: string) => {
-    const lanes = data.lanes || [];
+    const currentLanes = Array.isArray(data.lanes) ? [...data.lanes] : [];
     const newLane: Lane = {
-      id: `lane_${Date.now()}`,
-      name: `Lane ${lanes.length + 1}`,
+      id: `lane_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      name: `Lane ${currentLanes.length + 1}`,
       height: 120,
-      color: laneColors[lanes.length % laneColors.length]
+      color: laneColors[currentLanes.length % laneColors.length]
     };
     
     let updatedLanes: Lane[];
     if (targetLaneId) {
-      const index = lanes.findIndex(l => l.id === targetLaneId);
-      updatedLanes = [...lanes.slice(0, index + 1), newLane, ...lanes.slice(index + 1)];
+      const index = currentLanes.findIndex(l => l.id === targetLaneId);
+      updatedLanes = [...currentLanes.slice(0, index + 1), newLane, ...currentLanes.slice(index + 1)];
     } else {
-      updatedLanes = [...lanes, newLane];
+      updatedLanes = [...currentLanes, newLane];
     }
     
-    console.log('Adding lane below, updated lanes:', updatedLanes);
-    updateNode(id, { 
+    // Create a completely new data object to ensure React detects the change
+    const newData = {
+      ...data,
       lanes: updatedLanes
-    });
+    };
+    
+    updateNode(id, newData);
     setShowContextMenu(false);
-  }, [data.lanes, id, updateNode]);
+  }, [data, id, updateNode]);
 
   const divideLane = useCallback((laneId: string) => {
     const lanes = data.lanes || [];
@@ -186,6 +191,8 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
   const poolHeight = data.height || 200;
   const poolWidth = data.width || 600;
 
+  // Removed debug logs - functionality is working
+
   // Clear selected lane when clicking outside
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -222,7 +229,7 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
         style={{
           width: poolWidth,
           height: poolHeight,
-          zIndex: -50, // Always in background - this won't change the wrapper z-index
+          zIndex: 'auto', // Let lanes manage their own z-index
         }}
         onContextMenu={(e) => handleContextMenu(e)}
       >
@@ -250,7 +257,6 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log('Add lane button clicked');
                     addLaneBelow();
                   }}
                   className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-xs flex items-center gap-1 mx-auto"
@@ -269,9 +275,11 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
 
               const isSelected = selectedLaneId === lane.id;
 
+              // Lane rendering - z-index issue fixed
+
               return (
                 <div 
-                  key={lane.id}
+                  key={`${lane.id}-${lane.name}`}
                   className={`lane-container relative border-b border-gray-300 last:border-b-0 group transition-all ${
                     isSelected ? 'ring-2 ring-blue-400 ring-inset' : ''
                   }`}
@@ -280,7 +288,7 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
                     height: `${laneActualHeight}px`,
                     minHeight: '60px',
                     flexShrink: 0,
-                    zIndex: -45, // Slightly above pool but still behind other nodes
+                    zIndex: 1, // Positive z-index to ensure visibility
                   }}
                   onClick={(e) => handleLaneClick(e, lane.id)}
                   onContextMenu={(e) => handleContextMenu(e, lane.id)}
@@ -288,7 +296,8 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
                   {/* Lane Header */}
                   <div className={`absolute top-0 left-0 right-0 flex items-center justify-between p-2 ${
                     isSelected ? 'bg-blue-50/90' : 'bg-white/70'
-                  } z-10`}>
+                  }`}
+                  style={{ zIndex: 10 }}>
                     <div className="flex items-center gap-2">
                       <Users size={14} className={isSelected ? 'text-blue-600' : 'text-gray-600'} />
                       {editingLane === lane.id ? (

@@ -7,7 +7,7 @@ export interface ProcessModel {
 
 export interface ProcessElement {
   id: string;
-  type: 'process' | 'event' | 'gateway' | 'lane' | 'pool' | 'data-object';
+  type: 'process' | 'event' | 'gateway' | 'lane' | 'pool' | 'pool-with-lanes' | 'data-object';
   label: string;
   description?: string;
   position: {
@@ -24,6 +24,14 @@ export interface ProcessElement {
     assignee?: string;
     performer?: string;
     state?: string;
+    lanes?: Array<{
+      id: string;
+      name: string;
+      height: number;
+      color: string;
+    }>;
+    width?: number;
+    height?: number;
   };
 }
 
@@ -123,10 +131,15 @@ class AIService {
       console.log(`🖼️ Including ${images.length} images in request`);
     }
     
+    const body: any = { message, currentProcess };
+    if (images && images.length > 0) {
+      body.images = images;
+    }
+
     const response = await fetch(`${API_BASE_URL}/diagram-chat?id=${diagramId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, currentProcess, images }),
+      body: JSON.stringify(body),
     });
     
     if (!response.ok) {
