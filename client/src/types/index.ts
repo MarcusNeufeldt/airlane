@@ -1,5 +1,5 @@
 export type NodeType = 'process' | 'event' | 'gateway' | 'lane' | 'pool' | 'pool-with-lanes' | 'data-object';
-export type EventType = 'start' | 'intermediate' | 'end';
+export type EventType = 'start' | 'intermediate' | 'end' | 'boundary';
 export type ProcessType = 'task' | 'subprocess';
 export type TaskType = 'user' | 'service' | 'manual' | 'script' | 'business-rule' | 'send' | 'receive';
 export type GatewayType = 'exclusive' | 'parallel' | 'inclusive' | 'event-based' | 'complex';
@@ -22,6 +22,7 @@ export interface BaseNodeData {
 export interface EventNodeData extends BaseNodeData {
   nodeType: 'event';
   eventType: EventType;
+  eventSubType?: 'error' | 'timer' | 'message';
 }
 
 export interface ProcessNodeData extends BaseNodeData {
