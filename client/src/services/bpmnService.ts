@@ -475,11 +475,33 @@ export class BPMNService {
 
       console.log(`Data Association ${index}: ${id}, ${sourceRef} -> ${targetRef}`);
 
-      if (sourceRef && targetRef) {
+      let finalSource = sourceRef;
+      let finalTarget = targetRef;
+      const tagName = assoc.tagName.toLowerCase();
+
+      // For associations, the source/target might be a dataInput/dataOutput inside a task.
+      // We need to resolve this to the task itself for the visual connection.
+      if (tagName.includes('datainputassociation')) {
+        const targetElement = targetRef ? xmlDoc.querySelector(`[id="${targetRef}"]`) : null;
+        const parentTask = targetElement?.closest('task, serviceTask, userTask, businessRuleTask, scriptTask, sendTask, receiveTask, manualTask');
+        if (parentTask && parentTask.getAttribute('id')) {
+          finalTarget = parentTask.getAttribute('id');
+          console.log(`Remapped dataInputAssociation target from ${targetRef} to task ${finalTarget}`);
+        }
+      } else if (tagName.includes('dataoutputassociation')) {
+        const sourceElement = sourceRef ? xmlDoc.querySelector(`[id="${sourceRef}"]`) : null;
+        const parentTask = sourceElement?.closest('task, serviceTask, userTask, businessRuleTask, scriptTask, sendTask, receiveTask, manualTask');
+        if (parentTask && parentTask.getAttribute('id')) {
+          finalSource = parentTask.getAttribute('id');
+          console.log(`Remapped dataOutputAssociation source from ${sourceRef} to task ${finalSource}`);
+        }
+      }
+
+      if (finalSource && finalTarget) {
         edges.push({
           id,
-          source: sourceRef,
-          target: targetRef,
+          source: finalSource,
+          target: finalTarget,
           type: 'association',
           markerEnd: { type: MarkerType.ArrowClosed },
           style: { strokeDasharray: '5 5' },
