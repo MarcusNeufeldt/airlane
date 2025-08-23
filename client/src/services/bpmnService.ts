@@ -322,8 +322,14 @@ export class BPMNService {
       const laneInfo = assignedLaneId ? lanes.get(assignedLaneId) : null;
       const poolId = laneInfo?.poolId;
       
-      // A node's parent can be a pool (via a lane) or another node (e.g., boundary events)
+      // A node's parent can be a pool (via a lane), another node (e.g., boundary events), or a sub-process
       let parentNodeId: string | undefined = poolId;
+      const parentSubProcess = element.closest('subProcess');
+
+      if (parentSubProcess) {
+        parentNodeId = parentSubProcess.getAttribute('id') || undefined;
+      }
+      
       if (tagName.includes('boundaryevent')) {
         const attachedToRef = element.getAttribute('attachedToRef');
         if (attachedToRef) {
@@ -366,6 +372,9 @@ export class BPMNService {
         nodeType = 'gateway';
         nodeData.gatewayType = getGatewayType(element);
 
+      } else if (tagName.includes('subprocess')) {
+        nodeType = 'process';
+        nodeData.processType = 'subprocess';
       } else if (tagName.includes('dataobjectreference')) {
         nodeType = 'data-object';
         nodeData.dataObjectType = 'data-object';
