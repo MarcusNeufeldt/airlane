@@ -327,7 +327,11 @@ export class BPMNService {
       const parentSubProcess = element.closest('subProcess');
 
       if (parentSubProcess) {
-        parentNodeId = parentSubProcess.getAttribute('id') || undefined;
+        const parentId = parentSubProcess.getAttribute('id');
+        // A node cannot be its own parent
+        if (parentId && parentId !== id) {
+          parentNodeId = parentId;
+        }
       }
       
       if (tagName.includes('boundaryevent')) {
