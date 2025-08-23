@@ -29,33 +29,21 @@ export const DataObjectNode: React.FC<NodeProps<DataObjectNodeData>> = ({ id, da
   };
 
   const getDataIcon = () => {
-    switch (data.dataType) {
-      case 'input':
-        return <Download className="w-4 h-4 text-green-600" />;
-      case 'output':
-        return <Upload className="w-4 h-4 text-blue-600" />;
-      case 'collection':
-        return <Archive className="w-4 h-4 text-purple-600" />;
-      default:
-        return <FileText className="w-4 h-4 text-gray-600" />;
+    if (data.dataObjectType === 'data-store') {
+      return <Database className="w-5 h-5 text-gray-700" />;
     }
+    // Default to document icon for 'data-object' or if type is undefined
+    return <FileText className="w-5 h-5 text-gray-700" />;
   };
 
   const getBackgroundColor = () => {
-    switch (data.dataType) {
-      case 'input':
-        return 'bg-green-50 border-green-300';
-      case 'output':
-        return 'bg-blue-50 border-blue-300';
-      case 'collection':
-        return 'bg-purple-50 border-purple-300';
-      default:
-        return 'bg-gray-50 border-gray-300';
-    }
+    // A neutral color for both data objects and data stores.
+    // The distinction is the icon.
+    return 'bg-gray-50 border-gray-400';
   };
 
   return (
-    <div className="relative">
+    <div className="relative group">
       {/* Connection handles - data objects typically connect via associations */}
       <Handle 
         type="target" 
@@ -78,7 +66,7 @@ export const DataObjectNode: React.FC<NodeProps<DataObjectNodeData>> = ({ id, da
       <Handle 
         type="source" 
         position={Position.Bottom} 
-        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform" 
+        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-60 group-hover:!opacity-100" 
         id="association-bottom"
       />
       
@@ -128,7 +116,7 @@ export const DataObjectNode: React.FC<NodeProps<DataObjectNodeData>> = ({ id, da
       {/* Collection indicator for collection type */}
       {data.dataType === 'collection' && (
         <div className="absolute bottom-1 right-1">
-          <Database className="w-3 h-3 text-purple-600" />
+          <Archive className="w-3 h-3 text-gray-600" />
         </div>
       )}
     </div>

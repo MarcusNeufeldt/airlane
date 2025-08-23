@@ -369,9 +369,9 @@ export class BPMNService {
         nodeType = 'gateway';
         nodeData.gatewayType = getGatewayType(element);
 
-      } else if (tagName.includes('dataobject')) {
+      } else if (tagName === 'dataobjectreference' || tagName === 'datastorereference') {
         nodeType = 'data-object';
-        nodeData.dataType = 'input';
+        nodeData.dataObjectType = tagName === 'dataobjectreference' ? 'data-object' : 'data-store';
       }
       
       if (nodeType) {

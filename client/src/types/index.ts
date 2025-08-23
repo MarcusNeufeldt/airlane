@@ -72,6 +72,7 @@ export interface PoolWithLanesData extends BaseNodeData {
 export interface DataObjectNodeData extends BaseNodeData {
   nodeType: 'data-object';
   dataType: DataObjectType;
+  dataObjectType?: 'data-object' | 'data-store';
   state?: string;
 }
 
