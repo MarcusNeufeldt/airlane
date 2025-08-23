@@ -296,23 +296,26 @@ export class BPMNService {
     console.log(`Found ${lanes.size} lanes and ${pools.size} pools`);
     console.log('Lane assignments:', Array.from(elementLaneMap.entries()));
 
-    // Process all BPMN elements from all processes
-    const elementsToProcess: Element[] = [];
-    allProcesses.forEach(p => elementsToProcess.push(...Array.from(p.children)));
-    
-    for (let i = 0; i < elementsToProcess.length; i++) {
-      const element = elementsToProcess[i];
+    // Process all elements that have a shape in the diagram
+    for (const id of shapePositions.keys()) {
+      const element = xmlDoc.querySelector(`[id="${id}"]`);
+      
+      if (!element) {
+        console.warn(`Shape found for element with ID ${id}, but the element itself was not found in the XML.`);
+        continue;
+      }
+
       const tagName = element.tagName.toLowerCase();
-      const id = element.getAttribute('id') || `element_${i}`;
       const name = (element.getAttribute('name') || '').replace(/&#10;/g, '\n');
       
-      // Skip sequence flows and lanes (we'll process them separately)
-      if (tagName === 'sequenceflow' || tagName === 'lane' || tagName === 'laneset') continue;
+      // Skip lanes and pools as they are handled separately by the pool/lane processing logic
+      if (tagName.includes('lane') || tagName.includes('participant')) {
+        continue;
+      }
       
       // Get position and dimensions from diagram
-      const positionData = shapePositions.get(id) || { x: 100 + (i * 150), y: 200, width: 100, height: 80 };
+      const positionData = shapePositions.get(id)!; // We know it exists because we are iterating its keys
       const position = { x: positionData.x, y: positionData.y };
-      console.log(`Node ${id}: position(${position.x}, ${position.y}) - ${shapePositions.has(id) ? 'from diagram' : 'fallback'}`);
       
       // Check if element is assigned to a lane
       const assignedLaneId = elementLaneMap.get(id);
@@ -326,12 +329,6 @@ export class BPMNService {
         if (attachedToRef) {
           parentNodeId = attachedToRef;
         }
-      }
-      
-      if (assignedLaneId) {
-        console.log(`🎯 Element ${id} assigned to lane ${assignedLaneId} (${laneInfo?.name}) in pool ${poolId || 'none'}`);
-      } else {
-        console.log(`❌ Element ${id} not assigned to any lane`);
       }
       
       // Determine node type based on BPMN element type
@@ -375,6 +372,9 @@ export class BPMNService {
       } else if (tagName.includes('datastorereference')) {
         nodeType = 'data-object';
         nodeData.dataObjectType = 'data-store';
+      } else if (tagName.includes('datainput') || tagName.includes('dataoutput')) {
+        nodeType = 'data-object';
+        nodeData.dataObjectType = 'data-object'; // Render as a document icon
       }
       
       if (nodeType) {
