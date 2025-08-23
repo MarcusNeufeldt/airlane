@@ -676,6 +676,24 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
                           currentDirection === 'down' ? 'output-bottom' : 
                           currentDirection === 'left' ? 'output-left' : 'output-top';
           }
+        } else if (currentSourceNode?.type === 'data-object') {
+          // For data objects, use association handles
+          switch (currentDirection) {
+            case 'right':
+              sourceHandle = 'association-right';
+              break;
+            case 'down':
+              sourceHandle = 'association-bottom';
+              break;
+            case 'left':
+              sourceHandle = 'association-left';
+              break;
+            case 'up':
+              sourceHandle = 'association-top';
+              break;
+            default:
+              sourceHandle = 'association-right';
+          }
         } else {
           // For process/gateway nodes
           switch (currentDirection) {
@@ -749,8 +767,8 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
           id: `edge-${Date.now()}`,
           source: sourceNodeId,
           target: newNode.id,
-          sourceHandle: null, // Let React Flow auto-connect for now
-          targetHandle: null,  // Let React Flow auto-connect for now
+          sourceHandle: sourceHandle,
+          targetHandle: targetHandle,
           type: 'sequence-flow',
           markerEnd: { type: 'arrowclosed' as const },
         };

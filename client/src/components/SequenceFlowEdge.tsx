@@ -102,11 +102,24 @@ export const SequenceFlowEdge: React.FC<EdgeProps> = ({
         waypoints.push({ x: endX, y: gridAlignedY });
       }
     } else if (horizontalDistance > gridSize) {
-      // Only horizontal movement
-      waypoints.push({ x: endX, y: startY });
+      // Only horizontal movement - add intermediate point for arrow direction
+      const intermediateX = startX + (endX - startX) * 0.95; // 95% of the way
+      waypoints.push({ x: intermediateX, y: startY });
     } else if (verticalDistance > gridSize) {
-      // Only vertical movement
-      waypoints.push({ x: startX, y: endY });
+      // Only vertical movement - add intermediate point for arrow direction  
+      const intermediateY = startY + (endY - startY) * 0.95; // 95% of the way
+      waypoints.push({ x: startX, y: intermediateY });
+    } else {
+      // Very short distance - add a tiny intermediate point for direction
+      if (Math.abs(endX - startX) > Math.abs(endY - startY)) {
+        // More horizontal than vertical
+        const intermediateX = startX + (endX - startX) * 0.8;
+        waypoints.push({ x: intermediateX, y: startY });
+      } else {
+        // More vertical than horizontal
+        const intermediateY = startY + (endY - startY) * 0.8;
+        waypoints.push({ x: startX, y: intermediateY });
+      }
     }
 
     waypoints.push({ x: endX, y: endY });

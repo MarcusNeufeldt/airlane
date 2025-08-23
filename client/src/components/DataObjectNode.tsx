@@ -29,55 +29,54 @@ export const DataObjectNode: React.FC<NodeProps<DataObjectNodeData>> = ({ id, da
   };
 
   return (
-    <div 
-      className="relative group flex flex-col items-center justify-center"
-      style={{ width: 80, height: 90 }} // Smaller, invisible bounding box for handles
-    >
-      {/* Connection handles - positioned directly on the icon edges */}
-      <Handle 
-        type="target" 
-        position={Position.Top}
-        id="association-top"
-        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
-        style={{ top: 20, left: '50%', transform: 'translate(-50%, -50%)' }}
-      />
-      <Handle 
-        type="target" 
-        position={Position.Left}
-        id="association-left"
-        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
-        style={{ top: '50%', left: 24, transform: 'translate(-50%, -50%)' }}
-      />
-      <Handle 
-        type="source" 
-        position={Position.Right}
-        id="association-right"
-        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
-        style={{ top: '50%', right: 14, transform: 'translate(50%, -50%)' }}
-      />
-      <Handle 
-        type="source" 
-        position={Position.Bottom}
-        id="association-bottom"
-        className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
-        style={{ bottom: 18, top: 'auto', left: '50%', transform: 'translate(-50%, 50%)' }}
-      />
-      
-      {/* Visible Content: Icon and Label */}
+    <div className="relative group">
+      {/* BPMN Data Object Box */}
       <div 
-        className={`flex flex-col items-center p-2 rounded-md transition-all ${selected ? 'bg-blue-100 ring-2 ring-blue-400' : 'bg-transparent'}`}
+        className={`bg-white border-2 rounded-lg shadow-lg transition-all duration-150 hover:shadow-xl flex flex-col items-center justify-center p-3 ${
+          selected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-400 hover:border-gray-500'
+        }`}
+        style={{ width: 80, height: 90 }}
         onDoubleClick={handleDoubleClick}
       >
+        {/* Connection handles - positioned on the box edges */}
+        <Handle 
+          type="target" 
+          position={Position.Top}
+          id="association-top"
+          className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform" 
+          style={{ top: -6, left: '50%', transform: 'translate(-50%, 0)' }}
+        />
+        <Handle 
+          type="target" 
+          position={Position.Left}
+          id="association-left"
+          className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform" 
+          style={{ top: '50%', left: -6, transform: 'translate(0, -50%)' }}
+        />
+        <Handle 
+          type="source" 
+          position={Position.Right}
+          id="association-right"
+          className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform" 
+          style={{ top: '50%', right: -6, transform: 'translate(0, -50%)' }}
+        />
+        <Handle 
+          type="source" 
+          position={Position.Bottom}
+          id="association-bottom"
+          className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform" 
+          style={{ bottom: -6, left: '50%', transform: 'translate(-50%, 0)' }}
+        />
         {/* Icon */}
         <div className="mb-1">
           {data.dataObjectType === 'data-store' ? (
-            <Database className="w-8 h-8 text-gray-700" />
+            <Database className="w-6 h-6 text-gray-700" />
           ) : data.dataType === 'storage' ? (
-            <HardDrive className="w-8 h-8 text-gray-700" />
+            <HardDrive className="w-6 h-6 text-gray-700" />
           ) : data.dataType === 'reference' ? (
-            <Link2 className="w-8 h-8 text-gray-700" />
+            <Link2 className="w-6 h-6 text-gray-700" />
           ) : (
-            <FileText className="w-8 h-8 text-gray-700" />
+            <FileText className="w-6 h-6 text-gray-700" />
           )}
         </div>
         
@@ -88,22 +87,22 @@ export const DataObjectNode: React.FC<NodeProps<DataObjectNodeData>> = ({ id, da
             onChange={handleLabelChange}
             onBlur={handleLabelBlur}
             onKeyDown={handleKeyDown}
-            className="w-20 text-center text-xs bg-white border-b border-gray-400 outline-none font-medium"
+            className="w-16 text-center text-xs bg-white border-b border-gray-400 outline-none font-medium"
             autoFocus
           />
         ) : (
-          <span className="text-center text-xs font-medium leading-tight max-w-[80px]">
+          <span className="text-center text-xs font-medium leading-tight max-w-[70px] text-gray-700">
             {data.label || 'Data'}
           </span>
         )}
+        
+        {/* Collection indicator for collection type */}
+        {data.dataType === 'collection' && (
+          <div className="absolute bottom-1 right-1">
+            <Archive className="w-3 h-3 text-gray-600" />
+          </div>
+        )}
       </div>
-      
-      {/* Collection indicator for collection type */}
-      {data.dataType === 'collection' && (
-        <div className="absolute bottom-1 right-1">
-          <Archive className="w-3 h-3 text-gray-600" />
-        </div>
-      )}
     </div>
   );
 };
