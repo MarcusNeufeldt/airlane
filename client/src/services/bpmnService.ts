@@ -317,8 +317,13 @@ export class BPMNService {
       const positionData = shapePositions.get(id)!; // We know it exists because we are iterating its keys
       const position = { x: positionData.x, y: positionData.y };
       
+      // Check if element is assigned to a lane to determine its pool parent
+      const assignedLaneId = elementLaneMap.get(id);
+      const laneInfo = assignedLaneId ? lanes.get(assignedLaneId) : null;
+      const poolId = laneInfo?.poolId;
+      
       // A node's parent can be a pool (via a lane), another node (e.g., boundary events), or a sub-process
-      let parentNodeId: string | undefined = null;
+      let parentNodeId: string | undefined = poolId;
       const parentSubProcess = element.closest('subProcess');
 
       if (parentSubProcess) {
