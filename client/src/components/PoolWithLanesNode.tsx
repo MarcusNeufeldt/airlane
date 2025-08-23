@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { NodeProps, NodeResizer, Handle, Position } from 'reactflow';
-import { Building2, Users, Plus, Trash2, GripVertical, Split, ArrowUp, ArrowDown } from 'lucide-react';
+import { Building2, Users, Plus, Trash2, Split, ArrowUp, ArrowDown, Edit2 } from 'lucide-react';
 import { useDiagramStore } from '../stores/diagramStore';
 
 export interface Lane {
@@ -38,6 +38,7 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [contextLaneId, setContextLaneId] = useState<string | null>(null);
+  const [selectedLaneId, setSelectedLaneId] = useState<string | null>(null);
   const [editingLane, setEditingLane] = useState<string | null>(null);
   const [laneName, setLaneName] = useState('');
 
@@ -54,6 +55,11 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
     setContextMenuPosition({ x: e.clientX, y: e.clientY });
     setContextLaneId(laneId || null);
     setShowContextMenu(true);
+  }, []);
+
+  const handleLaneClick = useCallback((e: React.MouseEvent, laneId: string) => {
+    e.stopPropagation();
+    setSelectedLaneId(laneId);
   }, []);
 
   const addLaneAbove = useCallback((targetLaneId?: string) => {
@@ -149,6 +155,7 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
       height: newHeight
     });
     setShowContextMenu(false);
+    setSelectedLaneId(null);
   }, [data.lanes, id, updateNode]);
 
   const deleteEntirePool = useCallback(() => {
@@ -170,10 +177,22 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
     setLaneName(lane.name);
   }, []);
 
-
   const lanes = data.lanes || [];
   const poolHeight = data.height || 200;
   const poolWidth = data.width || 600;
+
+  // Clear selected lane when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.lane-container')) {
+        setSelectedLaneId(null);
+      }
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   return (
     <>
@@ -229,24 +248,31 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
               let laneActualHeight = lane.height;
               // Calculate actual height as proportion of available space
               const totalLaneHeight = lanes.reduce((sum, l) => sum + l.height, 0);
-              const availableHeight = poolHeight - 60; // Subtract some padding
+              const availableHeight = poolHeight - 4; // Small padding
               laneActualHeight = (lane.height / totalLaneHeight) * availableHeight;
+
+              const isSelected = selectedLaneId === lane.id;
 
               return (
                 <div 
                   key={lane.id}
-                  className="relative border-b border-gray-300 last:border-b-0 group"
+                  className={`lane-container relative border-b border-gray-300 last:border-b-0 group transition-all ${
+                    isSelected ? 'ring-2 ring-blue-400 ring-inset z-10' : ''
+                  }`}
                   style={{ 
                     backgroundColor: lane.color,
                     height: `${laneActualHeight}px`,
                     minHeight: '60px'
                   }}
+                  onClick={(e) => handleLaneClick(e, lane.id)}
                   onContextMenu={(e) => handleContextMenu(e, lane.id)}
                 >
                   {/* Lane Header */}
-                  <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-2 bg-white/70 z-10">
+                  <div className={`absolute top-0 left-0 right-0 flex items-center justify-between p-2 ${
+                    isSelected ? 'bg-blue-50/90' : 'bg-white/70'
+                  } z-10`}>
                     <div className="flex items-center gap-2">
-                      <Users size={14} className="text-gray-600" />
+                      <Users size={14} className={isSelected ? 'text-blue-600' : 'text-gray-600'} />
                       {editingLane === lane.id ? (
                         <input
                           type="text"
@@ -267,8 +293,10 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
                         />
                       ) : (
                         <span 
-                          className="text-sm font-medium text-gray-700 cursor-pointer hover:text-blue-600"
-                          onClick={(e) => {
+                          className={`text-sm font-medium cursor-pointer ${
+                            isSelected ? 'text-blue-700' : 'text-gray-700 hover:text-blue-600'
+                          }`}
+                          onDoubleClick={(e) => {
                             e.stopPropagation();
                             startEditingLane(lane);
                           }}
@@ -277,24 +305,76 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
                         </span>
                       )}
                     </div>
+                    
+                    {/* Quick actions for selected lane */}
+                    {isSelected && (
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditingLane(lane);
+                          }}
+                          className="p-1 hover:bg-blue-200 rounded text-blue-600"
+                          title="Edit lane name"
+                        >
+                          <Edit2 size={12} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            divideLane(lane.id);
+                          }}
+                          className="p-1 hover:bg-blue-200 rounded text-blue-600"
+                          title="Divide lane"
+                        >
+                          <Split size={12} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeLane(lane.id);
+                          }}
+                          className="p-1 hover:bg-red-200 rounded text-red-500"
+                          title="Delete lane"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Lane Resize Handle */}
+                  {/* Lane Resize Handle - Now with better drag handling */}
                   {index < lanes.length - 1 && (
                     <div
-                      className="absolute bottom-0 left-0 right-0 h-1 cursor-ns-resize bg-gray-400/20 hover:bg-gray-400/40 flex items-center justify-center z-20"
+                      className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize flex items-center justify-center z-30"
+                      style={{
+                        background: 'linear-gradient(to bottom, transparent, rgba(156, 163, 175, 0.3))'
+                      }}
                       onMouseDown={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        
+                        // Prevent node dragging
+                        const nodeElement = (e.target as HTMLElement).closest('.react-flow__node') as HTMLElement;
+                        if (nodeElement) {
+                          nodeElement.style.pointerEvents = 'none';
+                        }
+                        
                         const startY = e.clientY;
                         const startHeight = lane.height;
                         const nextLane = lanes[index + 1];
                         const nextStartHeight = nextLane.height;
                         
                         const handleMouseMove = (e: MouseEvent) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          
                           const deltaY = e.clientY - startY;
-                          const newHeight = startHeight + deltaY;
-                          const newNextHeight = nextStartHeight - deltaY;
+                          const scaleFactor = totalLaneHeight / availableHeight;
+                          const adjustedDelta = deltaY * scaleFactor;
+                          
+                          const newHeight = startHeight + adjustedDelta;
+                          const newNextHeight = nextStartHeight - adjustedDelta;
                           
                           if (newHeight >= 60 && newNextHeight >= 60) {
                             const updatedLanes = lanes.map((l, i) => {
@@ -307,7 +387,15 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
                           }
                         };
                         
-                        const handleMouseUp = () => {
+                        const handleMouseUp = (e: MouseEvent) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          
+                          // Re-enable node dragging
+                          if (nodeElement) {
+                            nodeElement.style.pointerEvents = '';
+                          }
+                          
                           document.removeEventListener('mousemove', handleMouseMove);
                           document.removeEventListener('mouseup', handleMouseUp);
                         };
@@ -316,7 +404,7 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
                         document.addEventListener('mouseup', handleMouseUp);
                       }}
                     >
-                      <GripVertical size={12} className="text-gray-500" />
+                      <div className="bg-gray-400 h-0.5 w-8 rounded" />
                     </div>
                   )}
                 </div>
