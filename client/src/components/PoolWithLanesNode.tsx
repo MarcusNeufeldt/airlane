@@ -81,6 +81,7 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
       updatedLanes = [newLane, ...lanes];
     }
     
+    console.log('Adding lane above, updated lanes:', updatedLanes);
     updateNode(id, { 
       lanes: updatedLanes
     });
@@ -104,6 +105,7 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
       updatedLanes = [...lanes, newLane];
     }
     
+    console.log('Adding lane below, updated lanes:', updatedLanes);
     updateNode(id, { 
       lanes: updatedLanes
     });
@@ -202,7 +204,8 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
   const availableHeight = poolHeight - 4;
 
   return (
-    <div style={{ zIndex: -50 }}>
+    // Wrapper with consistent background z-index regardless of selected state
+    <div style={{ zIndex: selected || dragging ? -49 : -50, position: 'relative' }}>
       <NodeResizer
         color="#4f46e5"
         isVisible={selected}
@@ -219,7 +222,7 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
         style={{
           width: poolWidth,
           height: poolHeight,
-          zIndex: -50, // Always in background
+          zIndex: -50, // Always in background - this won't change the wrapper z-index
         }}
         onContextMenu={(e) => handleContextMenu(e)}
       >
@@ -244,8 +247,13 @@ export const PoolWithLanesNode: React.FC<NodeProps<PoolWithLanesData>> = ({
               <div className="text-center">
                 <p className="text-sm mb-2">No lanes defined</p>
                 <button
-                  onClick={() => addLaneBelow()}
-                  className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-xs flex items-center gap-1"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Add lane button clicked');
+                    addLaneBelow();
+                  }}
+                  className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-xs flex items-center gap-1 mx-auto"
                 >
                   <Plus size={14} />
                   Add Lane
