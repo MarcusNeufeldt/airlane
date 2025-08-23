@@ -738,6 +738,199 @@ Only include properties that are relevant to the suggested node type.`;
     }
   }
 
+  // New method for node naming suggestions
+  async suggestNodeNames(context, additionalContext, bpmnXml) {
+    console.log('🏷️ Generating naming suggestions for:', context.targetNodeId);
+    
+    // Build a comprehensive prompt with raw BPMN XML schema
+    const prompt = `You are a BPMN expert helping to suggest better names for process elements based on the complete BPMN process schema.
+
+**COMPLETE BPMN XML SCHEMA:**
+${bpmnXml || 'BPMN XML not available'}
+
+**TARGET NODE TO RENAME:**
+- Current Name: "${context.currentName}"
+- Node Type: ${context.nodeType}
+- Node ID: ${context.targetNodeId}
+- Position in Flow: ${context.processContext}
+${context.properties ? `- Properties: ${JSON.stringify(context.properties)}` : ''}
+
+**IMMEDIATE CONTEXT:**
+- Comes After: ${(context.predecessors || []).map(p => `"${p.label}" (${p.type})`).join(', ') || 'Process Start'}
+- Leads To: ${(context.successors || []).map(s => `"${s.label}" (${s.type})`).join(', ') || 'Process End'}
+
+**BUSINESS CONTEXT:** ${additionalContext}
+
+**ANALYSIS INSTRUCTIONS:**
+1. **Parse the BPMN XML** above to understand the complete business process structure
+2. **Identify the target node** with ID "${context.targetNodeId}" in the XML
+3. **Analyze the business context** by examining:
+   - Process name and documentation elements
+   - Task types (userTask, serviceTask, etc.)
+   - Gateway types and decision points
+   - Event types and triggers
+   - Sequence flows and process logic
+   - Lane assignments and participants
+
+**BUSINESS PROCESS ANALYSIS:**
+Based on the BPMN XML schema, determine:
+- What type of business process this represents (e.g., customer onboarding, order fulfillment, approval workflow, etc.)
+- What business domain/industry this process serves
+- What the overall business objective is
+- Where the target node fits in the business workflow
+
+**TASK:** Suggest 3-4 contextually appropriate professional names for the target node "${context.currentName}" (ID: ${context.targetNodeId}) based on:
+- The complete BPMN process context from the XML
+- Industry-standard BPMN and business terminology  
+- The node's position and role in the business workflow
+- What business stakeholders would understand this step to be
+- Standard naming patterns for this type of BPMN element
+
+**REQUIREMENTS:**
+- Names must be 2-5 words maximum
+- Use professional business language
+- Make names specific to the business context
+- Avoid generic terms like "Task 1" or "Process Step"
+
+Respond with a JSON object in this exact format:
+{
+  "suggestions": ["Business Action Name", "Professional Activity", "Contextual Task Name", "Specific Process Step"],
+  "reasoning": "Brief explanation of why these names fit the business context (1-2 sentences max)",
+  "confidence": 0.8,
+  "context": "Business analysis approach used"
+}`;
+
+    try {
+      const response = await axios.post(`${this.baseURL}/chat/completions`, {
+        model: this.defaultModel,
+        messages: [
+          { 
+            role: 'system', 
+            content: 'You are a BPMN naming expert. Provide clear, professional node name suggestions.' 
+          },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 500
+      }, {
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const aiResponse = response.data.choices[0].message.content;
+      console.log('🏷️ Raw AI naming response:', aiResponse);
+
+      // Parse JSON response (handle potential markdown wrapping)
+      let suggestion;
+      try {
+        const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+        const jsonString = jsonMatch ? jsonMatch[0] : aiResponse;
+        suggestion = JSON.parse(jsonString);
+      } catch (parseError) {
+        console.error('❌ Failed to parse AI naming response:', parseError);
+        throw new Error('Invalid AI response format');
+      }
+
+      // Validate and clean the suggestion
+      const validatedSuggestion = this.validateNamingSuggestion(suggestion);
+      console.log('✅ Validated naming suggestion:', validatedSuggestion);
+      
+      return validatedSuggestion;
+    } catch (error) {
+      console.error('❌ AI naming service error:', error.message);
+      
+      // Fallback to heuristic-based suggestions
+      return this.getFallbackNamingSuggestion(context);
+    }
+  }
+
+  // Helper method to get fallback naming suggestions
+  getFallbackNamingSuggestion(context) {
+    console.log('🏷️ Using fallback naming suggestions for:', context.nodeType);
+    
+    let suggestions = [];
+    let reasoning = '';
+    
+    switch (context.nodeType) {
+      case 'process':
+        suggestions = ['Process Task', 'Complete Step', 'Execute Activity', 'Perform Action'];
+        reasoning = 'Generic task names based on common process patterns';
+        break;
+      case 'event':
+        if (context.properties?.eventType === 'start') {
+          suggestions = ['Process Started', 'Request Received', 'Case Opened', 'Workflow Initiated'];
+        } else if (context.properties?.eventType === 'end') {
+          suggestions = ['Process Completed', 'Request Fulfilled', 'Case Closed', 'Workflow Finished'];
+        } else {
+          suggestions = ['Event Occurred', 'Status Changed', 'Milestone Reached', 'Signal Received'];
+        }
+        reasoning = 'Standard event naming based on event type and common patterns';
+        break;
+      case 'gateway':
+        if (context.properties?.gatewayType === 'exclusive') {
+          suggestions = ['Decision Point', 'Approval Required?', 'Route Selection', 'Check Condition'];
+        } else if (context.properties?.gatewayType === 'parallel') {
+          suggestions = ['Parallel Split', 'Concurrent Start', 'Multi-track Processing', 'Parallel Merge'];
+        } else {
+          suggestions = ['Process Gateway', 'Flow Control', 'Decision Hub', 'Route Manager'];
+        }
+        reasoning = 'Gateway names based on type and decision logic patterns';
+        break;
+      case 'data-object':
+        suggestions = ['Process Data', 'Information Object', 'Document', 'Data Asset'];
+        reasoning = 'Generic data object names for information handling';
+        break;
+      default:
+        suggestions = ['Process Element', 'BPMN Component', 'Workflow Item', 'Process Node'];
+        reasoning = 'Fallback names for unknown element types';
+    }
+
+    return {
+      suggestions: suggestions.slice(0, 4),
+      reasoning,
+      confidence: 0.6,
+      context: 'Heuristic-based fallback suggestions'
+    };
+  }
+
+  // Helper method to validate and clean naming suggestions
+  validateNamingSuggestion(suggestion) {
+    // Ensure required fields exist
+    if (!suggestion.suggestions || !Array.isArray(suggestion.suggestions)) {
+      suggestion.suggestions = ['Improved Name', 'Better Label', 'Clear Title'];
+    }
+    
+    if (!suggestion.reasoning || typeof suggestion.reasoning !== 'string') {
+      suggestion.reasoning = 'AI-generated naming suggestions based on context';
+    }
+    
+    if (!suggestion.confidence || typeof suggestion.confidence !== 'number') {
+      suggestion.confidence = 0.7;
+    }
+    
+    if (!suggestion.context || typeof suggestion.context !== 'string') {
+      suggestion.context = 'Context-aware naming analysis';
+    }
+
+    // Ensure suggestions are clean and reasonable
+    suggestion.suggestions = suggestion.suggestions
+      .filter(name => name && typeof name === 'string' && name.length > 0)
+      .map(name => name.trim())
+      .slice(0, 4); // Maximum 4 suggestions
+
+    // Ensure confidence is between 0 and 1
+    suggestion.confidence = Math.max(0, Math.min(1, suggestion.confidence));
+
+    // Truncate reasoning if too long
+    if (suggestion.reasoning.length > 200) {
+      suggestion.reasoning = suggestion.reasoning.substring(0, 200) + '...';
+    }
+
+    return suggestion;
+  }
+
   // Helper method to validate and clean suggestions
   validateSuggestion(suggestion) {
     const validNodeTypes = ['process', 'event', 'gateway', 'data-object'];

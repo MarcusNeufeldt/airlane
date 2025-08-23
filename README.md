@@ -20,6 +20,10 @@ A professional BPMN 2.0 process modeling platform with enterprise-grade UX featu
 
 ### 🤖 **AI-Powered Process Generation** 
 - **OpenRouter Integration** - Powered by Google Gemini 2.5 Flash with reasoning models
+- **Smart Node Prediction** - AI analyzes process context and suggests next logical nodes
+- **Context-Aware Naming** - AI suggests professional BPMN node names with complete process analysis
+- **Raw BPMN XML Context** - AI receives industry-standard XML for precise business intelligence
+- **AI Preview Mode** - Accept/Decline/Retry interface for all AI suggestions
 - **Natural Language Processing** - Generate complete business processes from descriptions
 - **Intelligent Process Analysis** - AI-powered recommendations and optimization insights
 - **Context-Aware Generation** - AI understands current process state for smart suggestions
@@ -105,7 +109,10 @@ A professional BPMN 2.0 process modeling platform with enterprise-grade UX featu
 - **BPMN Import/Export**: Universal compatibility with Signavio, Camunda, Bizagi
 - **Context Menus**: Right-click elements for quick actions and modifications
 
-### 🤖 **AI-Powered Process Generation**
+### 🤖 **AI-Powered Smart Features**
+- **AI Smart Node**: Click any node → "AI Smart Node" button for intelligent next node suggestions
+- **Smart Renaming**: Click the edit icon in QuickNodeSelector for context-aware naming suggestions
+- **AI Preview Mode**: Accept/Decline/Retry interface for all AI recommendations
 - **Open Chat**: Click "AI Assistant" to open the intelligent process chat panel
 - **Natural Language**: Describe business processes in plain English
 - **Example Prompts**:
@@ -198,6 +205,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Zustand** for state management
 
 ## 🎬 **Recent Updates**
+
+### v3.1 - AI Smart Features (January 2025)
+- ✅ **AI Smart Node System** - Intelligent next node prediction with Accept/Decline/Retry interface
+- ✅ **Smart Node Renaming** - Context-aware AI naming suggestions with complete process analysis
+- ✅ **Raw BPMN XML Context** - Industry-standard XML schema sent to AI for precise business intelligence
+- ✅ **AI Preview Mode** - Visual node preview with confidence indicators and collapsible reasoning
+- ✅ **Separated AI Architecture** - Modular AI services with dedicated naming and prediction features
 
 ### v3.0 - Professional Design Tool Features (January 2025)
 - ✅ **QuickNodeSelector System** - Professional click-to-place node creation with directional positioning

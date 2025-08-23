@@ -62,6 +62,13 @@ export interface AINodeSuggestion {
   };
 }
 
+export interface AINameSuggestion {
+  suggestions: string[];
+  reasoning: string;
+  confidence: number;
+  context: string;
+}
+
 // Legacy interfaces for backward compatibility
 export interface DatabaseSchema {
   tables: Table[];

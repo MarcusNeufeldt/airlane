@@ -13,9 +13,11 @@ import {
   Loader2,
   Check,
   X,
-  RefreshCw
+  RefreshCw,
+  Edit3
 } from 'lucide-react';
 import { aiService, AINodeSuggestion, ProcessModel } from '../services/aiService';
+import { aiNamingService, AINameSuggestion } from '../services/aiNamingService';
 import { useDiagramStore } from '../stores/diagramStore';
 
 interface QuickNodeSelectorProps {
@@ -45,7 +47,7 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
   onClose
 }) => {
   const selectorRef = useRef<HTMLDivElement>(null);
-  const { nodes, edges } = useDiagramStore();
+  const { nodes, edges, updateNode } = useDiagramStore();
   
   // Existing state
   const [selectedDirection, setSelectedDirection] = useState<'right' | 'down' | 'left' | 'up'>('right');
@@ -56,6 +58,24 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [showReasoning, setShowReasoning] = useState(false);
+  
+  // Smart Rename state
+  const [isRenameMode, setIsRenameMode] = useState(false);
+  const [nameSuggestions, setNameSuggestions] = useState<AINameSuggestion | null>(null);
+  const [isLoadingNames, setIsLoadingNames] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  
+  // Get source node for renaming
+  const sourceNode = nodes.find(node => node.id === sourceNodeId);
+  
+  // Handle node renaming
+  const handleNodeRename = (newName: string) => {
+    if (sourceNode && newName.trim() !== sourceNode.data.label) {
+      updateNode(sourceNodeId, { label: newName.trim() });
+      setIsRenameMode(false);
+      setNameSuggestions(null);
+    }
+  };
 
   // Convert current diagram to ProcessModel for AI
   const getCurrentProcess = (): ProcessModel => {
@@ -118,6 +138,35 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
   const retryAISuggestion = () => {
     setShowReasoning(false);
     requestAISuggestion();
+  };
+
+  // AI naming functions
+  const requestAINaming = async () => {
+    setIsLoadingNames(true);
+    setNameError(null);
+    try {
+      const currentProcess = getCurrentProcess();
+      const suggestions = await aiNamingService.suggestNodeNames(
+        sourceNodeId,
+        currentProcess,
+        'Suggest clear, professional BPMN node names that reflect the business context',
+        nodes,
+        edges
+      );
+      setNameSuggestions(suggestions);
+      setIsRenameMode(true);
+    } catch (error) {
+      setNameError('Failed to get naming suggestions. Please try again.');
+      console.error('AI naming error:', error);
+    } finally {
+      setIsLoadingNames(false);
+    }
+  };
+
+  const cancelRename = () => {
+    setIsRenameMode(false);
+    setNameSuggestions(null);
+    setNameError(null);
   };
 
   // Helper function to get the icon for AI suggestion
@@ -288,10 +337,72 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
           minWidth: '280px'
         }}
       >
-        <div className="text-sm font-medium text-gray-700 mb-3">Add Node</div>
+        {/* Header with node name and Smart Rename icon */}
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="text-sm font-medium text-gray-700">Add Node</div>
+            <div className="text-xs text-gray-500">From: {sourceNode?.data.label || 'Unnamed Node'}</div>
+          </div>
+          <button
+            onClick={requestAINaming}
+            disabled={isLoadingNames}
+            className="p-2 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-700 transition-colors disabled:opacity-50"
+            title="Smart Rename with AI"
+          >
+            {isLoadingNames ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Edit3 className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+
+        {/* AI Rename Suggestions */}
+        {isRenameMode && nameSuggestions && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="text-sm font-medium text-amber-800 mb-2 flex items-center gap-2">
+              <Edit3 className="w-4 h-4" />
+              AI Name Suggestions:
+            </div>
+            <div className="space-y-1 mb-3">
+              {nameSuggestions.suggestions.map((suggestion, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleNodeRename(suggestion)}
+                  className="w-full text-left p-2 bg-white hover:bg-amber-100 border border-amber-200 rounded text-sm transition-colors"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={cancelRename}
+                className="flex-1 px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white text-xs rounded transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={requestAINaming}
+                disabled={isLoadingNames}
+                className="flex-1 px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs rounded transition-colors disabled:opacity-50"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Rename Error */}
+        {nameError && (
+          <div className="mb-4 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+            {nameError}
+          </div>
+        )}
         
         {/* Direction Selector */}
-        <div className="grid grid-cols-4 gap-2 mb-4">
+        {!isRenameMode && (
+          <div className="grid grid-cols-4 gap-2 mb-4">
           {/* Up */}
           <div className="col-start-2">
             <button
@@ -359,6 +470,7 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
             </button>
           </div>
         </div>
+        )}
 
         {/* AI Preview Mode - Compact Visual Design */}
         {isAIMode && aiSuggestion ? (
@@ -443,8 +555,8 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
         )}
 
         {/* AI Smart Node Button */}
-        {!isAIMode && (
-          <div className="mb-4">
+        {!isAIMode && !isRenameMode && (
+          <div className="mb-4 space-y-2">
             <button
               onClick={requestAISuggestion}
               disabled={isLoadingAI}
@@ -462,11 +574,13 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
                 </>
               )}
             </button>
+            
+
           </div>
         )}
 
         {/* Manual Node Selection */}
-        {!isAIMode && (
+        {!isAIMode && !isRenameMode && (
           <>
             <div className="text-xs text-gray-500 mb-2 text-center">Or choose manually:</div>
             
@@ -491,6 +605,8 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
         )}
 
       </div>
+      
+
     </>
   );
 };

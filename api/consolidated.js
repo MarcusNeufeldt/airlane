@@ -415,6 +415,36 @@ module.exports = async (req, res) => {
         });
       }
     }
+
+    // Route: POST /suggest-node-names
+    if (method === 'POST' && url.includes('/suggest-node-names')) {
+      try {
+        const { context, additionalContext, bpmnXml } = body;
+        
+        if (!context || !context.targetNodeId) {
+          return res.status(400).json({ 
+            error: 'context with targetNodeId is required' 
+          });
+        }
+
+        console.log('🏷️ AI suggesting names for node:', context.targetNodeId);
+        if (bpmnXml) {
+          console.log('🏷️ BPMN XML provided for context, length:', bpmnXml.length);
+        }
+        
+        const aiService = new AIService();
+        const suggestion = await aiService.suggestNodeNames(context, additionalContext, bpmnXml);
+        console.log('✅ AI naming suggestions generated');
+        
+        return res.json({ suggestion });
+      } catch (error) {
+        console.error('❌ AI naming suggestion failed:', error.message);
+        return res.status(500).json({ 
+          error: 'Failed to get naming suggestions',
+          details: error.message 
+        });
+      }
+    }
     
     if (method === 'POST' && url.includes('/summarize-process')) {
         try {
