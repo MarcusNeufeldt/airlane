@@ -36,24 +36,28 @@ export const DataObjectNode: React.FC<NodeProps<DataObjectNodeData>> = ({ id, da
       {/* Connection handles - positioned directly on the icon edges */}
       <Handle 
         type="target" 
+        position={Position.Top}
         id="association-top"
         className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
         style={{ top: 20, left: '50%', transform: 'translate(-50%, -50%)' }}
       />
       <Handle 
         type="target" 
+        position={Position.Left}
         id="association-left"
         className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
         style={{ top: '50%', left: 24, transform: 'translate(-50%, -50%)' }}
       />
       <Handle 
         type="source" 
+        position={Position.Right}
         id="association-right"
         className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
         style={{ top: '50%', right: 14, transform: 'translate(50%, -50%)' }}
       />
       <Handle 
         type="source" 
+        position={Position.Bottom}
         id="association-bottom"
         className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-0 group-hover:!opacity-100" 
         style={{ bottom: 18, top: 'auto', left: '50%', transform: 'translate(-50%, 50%)' }}
