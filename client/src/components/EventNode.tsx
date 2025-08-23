@@ -134,7 +134,7 @@ export const EventNode: React.FC<NodeProps<EventNodeData>> = ({ id, data, select
       )}
       
       {/* Intermediate Event: Both inputs and outputs (can occur during the process) */}
-      {(data.eventType === 'intermediate' || data.eventType === 'boundary') && (
+      {data.eventType === 'intermediate' && (
         <>
           <Handle 
             type="target" 
@@ -158,6 +158,24 @@ export const EventNode: React.FC<NodeProps<EventNodeData>> = ({ id, data, select
             type="source" 
             position={Position.Bottom} 
             className="!w-3 !h-3 !bg-yellow-500 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-60 group-hover:!opacity-100" 
+            id="inter-bottom"
+          />
+        </>
+      )}
+      
+      {/* Boundary Event: Typically only has an output */}
+      {data.eventType === 'boundary' && (
+        <>
+          <Handle 
+            type="source" 
+            position={Position.Right} 
+            className="!w-3 !h-3 !bg-gray-500 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-60 group-hover:!opacity-100" 
+            id="inter-output"
+          />
+          <Handle 
+            type="source" 
+            position={Position.Bottom} 
+            className="!w-3 !h-3 !bg-gray-500 !border-2 !border-white !shadow-sm hover:!scale-125 !transition-transform !opacity-60 group-hover:!opacity-100" 
             id="inter-bottom"
           />
         </>
