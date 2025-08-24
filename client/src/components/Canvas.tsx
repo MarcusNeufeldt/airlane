@@ -708,8 +708,8 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
       
       if (newNode) {
         // Determine the correct source and target handles based on direction and node types
-        let sourceHandle: string;
-        let targetHandle: string;
+        let sourceHandle: string = 'output-right'; // Default fallback
+        let targetHandle: string = 'input-left';   // Default fallback
         
         // Get source node to determine its handle IDs
         const currentSourceNode = allNodes.find(n => n.id === sourceNodeId);
@@ -719,11 +719,15 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
           const eventData = currentSourceNode.data as any;
           if (eventData.eventType === 'start') {
             sourceHandle = currentDirection === 'right' ? 'start-right' : 'start-bottom';
-          } else {
-            // For intermediate/end events, use generic handles if they exist
-            sourceHandle = currentDirection === 'right' ? 'output-right' : 
-                          currentDirection === 'down' ? 'output-bottom' : 
-                          currentDirection === 'left' ? 'output-left' : 'output-top';
+          } else if (eventData.eventType === 'intermediate') {
+            // For intermediate events, use specific handle IDs
+            sourceHandle = currentDirection === 'right' ? 'inter-output' : 
+                          currentDirection === 'down' ? 'inter-bottom' : 
+                          currentDirection === 'left' ? 'inter-output' : 'inter-output'; // Left connections use right output
+          } else if (eventData.eventType === 'end') {
+            // End events don't have output handles, so this shouldn't happen
+            console.warn('⚠️  Attempting to connect FROM an end event - this is not allowed in BPMN');
+            sourceHandle = 'output-right'; // Use fallback to prevent connection
           }
         } else if (currentSourceNode?.type === 'data-object') {
           // For data objects, use association handles
@@ -768,11 +772,16 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
           const newEventData = newNode.data as any;
           if (newEventData.eventType === 'end') {
             targetHandle = currentDirection === 'right' ? 'end-left' : 'end-top';
+          } else if (newEventData.eventType === 'intermediate') {
+            // For intermediate events, use specific handle IDs
+            targetHandle = currentDirection === 'right' ? 'inter-input' : 
+                          currentDirection === 'down' ? 'inter-top' : 
+                          currentDirection === 'left' ? 'inter-input' : 'inter-top';
           } else {
-            // For start/intermediate events
-            targetHandle = currentDirection === 'right' ? 'input-left' : 
-                          currentDirection === 'down' ? 'input-top' : 
-                          currentDirection === 'left' ? 'input-right' : 'input-bottom';
+            // For start events, they don't have input handles, so connection should fail
+            // But if we're connecting TO a start event, we shouldn't allow that
+            console.warn('⚠️  Attempting to connect TO a start event - this is not allowed in BPMN');
+            targetHandle = 'input-left'; // Use fallback to prevent connection
           }
         } else if (newNode.type === 'data-object') {
           // Data objects use association handles
@@ -812,14 +821,24 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
           }
         }
         
+        // Determine edge type based on node types
+        let edgeType = 'sequence-flow';
+        let markerEnd: any = { type: 'arrowclosed' as const };
+        
+        // Use association edge for data objects
+        if (currentSourceNode?.type === 'data-object' || newNode.type === 'data-object') {
+          edgeType = 'association';
+          markerEnd = undefined; // Association edges typically don't have arrow markers
+        }
+        
         const newEdge = {
           id: `edge-${Date.now()}`,
           source: sourceNodeId,
           target: newNode.id,
           sourceHandle: sourceHandle,
           targetHandle: targetHandle,
-          type: 'sequence-flow',
-          markerEnd: { type: 'arrowclosed' as const },
+          type: edgeType,
+          markerEnd: markerEnd,
         };
         
         console.log('🔗 Creating edge with handles:', { 
@@ -842,7 +861,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
     }, 100); // Small delay to ensure node is created first
 
     setQuickNodeSelector(null);
-  }, [quickNodeSelector, nodes, addNode, onConnect]);
+  }, [quickNodeSelector, nodes, addNode, onConnect, snapToGrid, gridSize]);
   
   // Handle selection changes from ReactFlow
   const handleSelectionChange = useCallback((params: any) => {
