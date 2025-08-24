@@ -393,7 +393,7 @@ module.exports = async (req, res) => {
     // Route: POST /suggest-next-node
     if (method === 'POST' && url.includes('/suggest-next-node')) {
       try {
-        const { sourceNodeId, currentProcess, context } = body;
+        const { sourceNodeId, currentProcess, context, selectedDirection } = body;
         
         if (!sourceNodeId || !currentProcess) {
           return res.status(400).json({ 
@@ -401,9 +401,9 @@ module.exports = async (req, res) => {
           });
         }
 
-        console.log('🤖 AI suggesting next node for:', sourceNodeId);
+        console.log('🤖 AI suggesting next node for:', sourceNodeId, 'direction:', selectedDirection);
         const aiService = new AIService();
-        const suggestion = await aiService.suggestNextNode(sourceNodeId, currentProcess, context);
+        const suggestion = await aiService.suggestNextNode(sourceNodeId, currentProcess, context, selectedDirection);
         console.log('✅ AI suggestion generated');
         
         return res.json({ suggestion });

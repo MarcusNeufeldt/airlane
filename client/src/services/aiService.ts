@@ -510,7 +510,8 @@ ${process.elements.map(e => `- ${e.type}: ${e.label}`).join('\n')}
   async suggestNextNode(
     sourceNodeId: string, 
     currentProcess: ProcessModel,
-    context?: string
+    context?: string,
+    selectedDirection?: string
   ): Promise<AINodeSuggestion> {
     console.log('🤖 suggestNextNode called for node:', sourceNodeId);
     
@@ -523,7 +524,8 @@ ${process.elements.map(e => `- ${e.type}: ${e.label}`).join('\n')}
         body: JSON.stringify({ 
           sourceNodeId, 
           currentProcess,
-          context: context || 'Suggest the most logical next BPMN element'
+          context: context || 'Suggest the most logical next BPMN element',
+          selectedDirection: selectedDirection || 'right'
         }),
       });
 

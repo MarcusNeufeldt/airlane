@@ -339,11 +339,13 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
 
       switch (type) {
         case 'event':
+          const eventType = options.eventType || 'start';
+          const defaultLabel = eventType === 'end' ? 'End' : eventType === 'intermediate' ? 'Intermediate' : 'Start';
           const eventData: EventNodeData = { 
             id, 
             nodeType: 'event', 
-            eventType: options.eventType || 'start', 
-            label: options.eventType === 'end' ? 'End' : options.eventType === 'intermediate' ? 'Intermediate' : 'Start'
+            eventType: eventType, 
+            label: options.label || defaultLabel
           };
           newNode = { id, type, position: snappedPosition, data: eventData };
           break;
@@ -351,8 +353,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
           const gatewayData: GatewayNodeData = { 
             id, 
             nodeType: 'gateway', 
-            gatewayType: 'exclusive', 
-            label: '' 
+            gatewayType: options.gatewayType || 'exclusive', 
+            label: options.label || '' 
           };
           newNode = { id, type, position: snappedPosition, data: gatewayData };
           break;
@@ -391,13 +393,15 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
           newNode = { id, type, position: snappedPosition, data: poolWithLanesData, zIndex: -20 };
           break;
         case 'data-object':
+          const dataType = options.dataType || 'input';
+          const defaultDataLabel = dataType === 'storage' ? 'Storage' : 
+                                   dataType === 'reference' ? 'Reference' : 
+                                   dataType === 'collection' ? 'Collection' : 'Data Object';
           const dataObjectData: DataObjectNodeData = { 
             id, 
             nodeType: 'data-object', 
-            dataType: options.dataType || 'input',
-            label: options.dataType === 'storage' ? 'Storage' : 
-                   options.dataType === 'reference' ? 'Reference' : 
-                   options.dataType === 'collection' ? 'Collection' : 'Data Object'
+            dataType: dataType,
+            label: options.label || defaultDataLabel
           };
           newNode = { id, type, position: snappedPosition, data: dataObjectData };
           break;
@@ -407,7 +411,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
             id, 
             nodeType: 'process', 
             processType: 'task', 
-            label: 'New Task' 
+            label: options.label || 'New Task' 
           };
           newNode = { id, type, position: snappedPosition, data: processData };
           break;

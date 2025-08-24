@@ -596,7 +596,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
   }, [contextMenu]);
 
   // Handle quick node selector actions
-  const handleQuickNodeSelect = useCallback((nodeType: string, direction: 'right' | 'down' | 'left' | 'up', eventType?: string) => {
+  const handleQuickNodeSelect = useCallback((nodeType: string, direction: 'right' | 'down' | 'left' | 'up', eventType?: string, suggestedLabel?: string) => {
     if (!quickNodeSelector) return;
 
     const sourceNode = nodes.find(n => n.id === quickNodeSelector.sourceNodeId);
@@ -656,7 +656,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
     }
 
     // Create the node with appropriate options
-    let options = {};
+    let options: any = {};
     if (nodeType === 'event' && eventType) {
       options = { eventType };
     } else if (nodeType === 'gateway' && eventType) {
@@ -665,6 +665,11 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
     } else if (nodeType === 'data-object' && eventType) {
       // For data objects, eventType is actually the dataType
       options = { dataType: eventType };
+    }
+    
+    // Add suggested label from AI if provided
+    if (suggestedLabel) {
+      options.label = suggestedLabel;
     }
 
     // Snap position to grid if enabled
@@ -696,9 +701,10 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
           return bTime - aTime; // Sort by newest first
         })[0]; // Get the newest node
       
-      console.log('All nodes:', allNodes.map(n => ({ id: n.id, pos: n.position })));
-      console.log('Looking for new node at position:', position);
-      console.log('Selected newest node:', newNode);
+      console.log('🔗 Connection Debug - All nodes:', allNodes.map(n => ({ id: n.id, pos: n.position })));
+      console.log('🔗 Connection Debug - Looking for new node at position:', finalPosition);
+      console.log('🔗 Connection Debug - Source node ID:', sourceNodeId);
+      console.log('🔗 Connection Debug - Selected newest node:', newNode);
       
       if (newNode) {
         // Determine the correct source and target handles based on direction and node types
@@ -816,18 +822,22 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
           markerEnd: { type: 'arrowclosed' as const },
         };
         
-        console.log('Creating edge with handles:', { 
+        console.log('🔗 Creating edge with handles:', { 
           sourceHandle, 
           targetHandle, 
           direction: currentDirection,
           sourceNodeType: currentSourceNode?.type,
           targetNodeType: newNode.type,
           sourceId: sourceNodeId,
-          targetId: newNode.id
+          targetId: newNode.id,
+          edgeObject: newEdge
         });
         
         // Add the edge using the store's onConnect method
-        onConnect(newEdge);
+        const connectionResult = onConnect(newEdge);
+        console.log('🔗 Connection result:', connectionResult);
+      } else {
+        console.error('🔗 ERROR: Could not find newly created node for connection!');
       }
     }, 100); // Small delay to ensure node is created first
 

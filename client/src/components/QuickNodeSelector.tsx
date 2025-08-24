@@ -24,7 +24,7 @@ interface QuickNodeSelectorProps {
   x: number; // Screen coordinates
   y: number; // Screen coordinates
   sourceNodeId: string;
-  onSelectNode: (nodeType: string, direction: 'right' | 'down' | 'left' | 'up', eventType?: string) => void;
+  onSelectNode: (nodeType: string, direction: 'right' | 'down' | 'left' | 'up', eventType?: string, suggestedLabel?: string) => void;
   onClose: () => void;
 }
 
@@ -107,7 +107,7 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
       const currentProcess = getCurrentProcess();
       // Use the currently selected direction as context for AI
       const contextWithDirection = `User wants to place the next node ${selectedDirection} of the current node. Suggest the most logical next BPMN element for this direction.`;
-      const suggestion = await aiService.suggestNextNode(sourceNodeId, currentProcess, contextWithDirection);
+      const suggestion = await aiService.suggestNextNode(sourceNodeId, currentProcess, contextWithDirection, selectedDirection);
       
       // Respect the user's selected direction instead of overriding it
       suggestion.direction = selectedDirection;
@@ -124,7 +124,7 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
 
   const acceptAISuggestion = () => {
     if (aiSuggestion) {
-      onSelectNode(aiSuggestion.nodeType, aiSuggestion.direction, aiSuggestion.subType);
+      onSelectNode(aiSuggestion.nodeType, aiSuggestion.direction, aiSuggestion.subType, aiSuggestion.label);
     }
   };
 

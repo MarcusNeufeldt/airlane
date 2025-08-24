@@ -567,9 +567,57 @@ Format your response in clear markdown with proper headers and bullet points.`;
     }
   }
 
-  async suggestNextNode(sourceNodeId, currentProcess, context = 'Suggest the most logical next BPMN element') {
+  // Enhanced: Direction-aware context analysis
+  analyzeDirectionalContext(sourceNodeId, selectedDirection, currentProcess) {
+    console.log('🧭 Analyzing directional context for:', sourceNodeId, 'direction:', selectedDirection);
+    
+    // Find connections going out from the source node
+    const outgoingConnections = currentProcess.flows.filter(flow => flow.source === sourceNodeId);
+    
+    // Enhanced: Check if the user has existing connections AND if they're trying a new direction
+    const hasNoOutgoing = outgoingConnections.length === 0;
+    const hasExistingConnections = outgoingConnections.length > 0;
+    
+    // Determine directional intent
+    let directionIntent = 'EXTEND_EXISTING';
+    let spatialContext = '';
+    
+    if (hasNoOutgoing) {
+      directionIntent = 'NEW_BRANCH';
+      spatialContext = `User chose ${selectedDirection} direction from a node with NO existing outgoing connections - creating first connection`;
+    } else if (hasExistingConnections) {
+      // The user is trying to add ANOTHER connection from a node that already has connections
+      // This is ALWAYS a new branch, regardless of direction
+      directionIntent = 'NEW_BRANCH';
+      spatialContext = `User chose ${selectedDirection} direction from a node that ALREADY HAS ${outgoingConnections.length} existing connection(s) - creating additional branch/alternative path`;
+    } else if (selectedDirection === 'left' || selectedDirection === 'up') {
+      // Left/up directions often indicate alternative/exception paths
+      directionIntent = 'NEW_BRANCH';
+      spatialContext = `User chose ${selectedDirection} direction which typically indicates alternative/exception path - creating new branch`;
+    } else {
+      directionIntent = 'EXTEND_EXISTING';
+      spatialContext = `User chose ${selectedDirection} direction continuing main process flow`;
+    }
+    
+    console.log('🧭 Direction analysis result:', {
+      selectedDirection,
+      outgoingCount: outgoingConnections.length,
+      directionIntent,
+      spatialContext
+    });
+    
+    return {
+      selectedDirection,
+      outgoingConnectionCount: outgoingConnections.length,
+      directionIntent,
+      spatialContext,
+      isLikelyNewBranch: directionIntent === 'NEW_BRANCH'
+    };
+  }
+
+  async suggestNextNode(sourceNodeId, currentProcess, context = 'Suggest the most logical next BPMN element', selectedDirection = 'right') {
     try {
-      console.log('🤖 Starting AI node suggestion for:', sourceNodeId);
+      console.log('🤖 Starting AI node suggestion for:', sourceNodeId, 'direction:', selectedDirection);
       
       // Find the source node
       const sourceNode = currentProcess.elements.find(el => el.id === sourceNodeId);
@@ -582,11 +630,32 @@ Format your response in clear markdown with proper headers and bullet points.`;
         flow.source === sourceNodeId || flow.target === sourceNodeId
       );
 
-      const prompt = `You are an expert BPMN process designer. Given the current process context, suggest the most logical next BPMN element.
+      // Enhanced: Analyze directional context
+      const directionAnalysis = this.analyzeDirectionalContext(sourceNodeId, selectedDirection, currentProcess);
 
-**Current Process Context:**
-- Total elements: ${currentProcess.elements.length}
-- Total flows: ${currentProcess.flows.length}
+      const prompt = `You are an expert BPMN process designer with spatial awareness. Given the current process context and user's directional intent, suggest the most logical next BPMN element.
+
+**🧭 CRITICAL: USER'S DIRECTIONAL INTENT**
+${directionAnalysis.spatialContext}
+
+**Direction Analysis:**
+- Selected Direction: ${directionAnalysis.selectedDirection}
+- Intent Classification: ${directionAnalysis.directionIntent}
+- Existing Outgoing Connections: ${directionAnalysis.outgoingConnectionCount}
+
+${directionAnalysis.directionIntent === 'NEW_BRANCH' ? 
+`**🌟 NEW BRANCH CONTEXT:**
+This is a NEW BRANCH from an existing node. Consider:
+- Error handling and exception paths
+- Alternative business flows and scenarios  
+- Parallel activities that can run concurrently
+- Approval/rejection decision paths
+- Escalation or fallback procedures
+- Data validation or quality checks
+
+Focus on nodes that CREATE ALTERNATIVES rather than continue the main sequence.` :
+`**➡️ EXISTING FLOW EXTENSION:**
+Continuing an established process flow in the natural sequence.`}
 
 **Source Node (where user clicked):**
 - ID: ${sourceNode.id}
@@ -600,9 +669,9 @@ ${connectedFlows.map(flow => `- ${flow.type}: ${flow.source} → ${flow.target} 
 **Full Process Elements:**
 ${currentProcess.elements.map(el => `- ${el.type}: ${el.label} (${el.id})`).join('\n')}
 
-**Context:** ${context}
+**Additional Context:** ${context}
 
-Based on BPMN best practices and the current process state, suggest the next most logical element to add.
+Based on BPMN best practices, the directional intent analysis, and current process state, suggest the next most logical element to add.
 
 **IMPORTANT:** Keep the reasoning very brief (maximum 1-2 sentences). Focus on the core logic, not detailed explanations.
 
@@ -655,7 +724,7 @@ Only include properties that are relevant to the suggested node type.`;
       } catch (parseError) {
         console.error('❌ Failed to parse AI suggestion JSON:', parseError);
         // Fallback suggestion
-        suggestion = this.getFallbackSuggestion(sourceNode);
+        suggestion = this.getFallbackSuggestion(sourceNode, selectedDirection);
       }
 
       // Validate and clean the suggestion
@@ -667,19 +736,35 @@ Only include properties that are relevant to the suggested node type.`;
       console.error('❌ AI Node Suggestion Error:', error.response?.data || error.message);
       // Return fallback suggestion instead of throwing
       const sourceNode = currentProcess.elements.find(el => el.id === sourceNodeId);
-      return this.getFallbackSuggestion(sourceNode);
+      return this.getFallbackSuggestion(sourceNode, selectedDirection);
     }
   }
 
   // Helper method to create fallback suggestions
-  getFallbackSuggestion(sourceNode) {
+  getFallbackSuggestion(sourceNode, selectedDirection = 'right') {
     if (!sourceNode) {
       return {
         nodeType: 'process',
         label: 'Process Task',
         reasoning: 'Default suggestion when source node not found',
         confidence: 0.5,
-        direction: 'right'
+        direction: selectedDirection
+      };
+    }
+
+    // Direction-aware heuristics
+    const isNewBranch = selectedDirection === 'left' || selectedDirection === 'up';
+    
+    if (isNewBranch && sourceNode.type === 'process') {
+      // For left/up from process tasks, suggest alternative paths
+      return {
+        nodeType: 'gateway',
+        subType: 'exclusive',
+        label: 'Exception Gateway',
+        reasoning: 'Creating alternative path for error handling or exceptions',
+        confidence: 0.8,
+        direction: selectedDirection,
+        properties: { gatewayType: 'exclusive' }
       };
     }
 
@@ -691,7 +776,7 @@ Only include properties that are relevant to the suggested node type.`;
           label: 'First Process Step',
           reasoning: 'Start events need a first business activity',
           confidence: 0.8,
-          direction: 'right',
+          direction: selectedDirection,
           properties: { taskType: 'user' }
         };
         }
@@ -701,7 +786,7 @@ Only include properties that are relevant to the suggested node type.`;
           label: 'End Event',
           reasoning: 'Completes the process flow',
           confidence: 0.7,
-          direction: 'right',
+          direction: selectedDirection,
           properties: { eventType: 'end' }
         };
         
@@ -712,7 +797,7 @@ Only include properties that are relevant to the suggested node type.`;
           label: 'Decision Gateway',
           reasoning: 'Tasks often need decision points',
           confidence: 0.6,
-          direction: 'right',
+          direction: selectedDirection,
           properties: { gatewayType: 'exclusive' }
         };
         
@@ -722,7 +807,7 @@ Only include properties that are relevant to the suggested node type.`;
           label: 'Process Task',
           reasoning: 'Gateways split to activities',
           confidence: 0.7,
-          direction: 'down',
+          direction: selectedDirection,
           properties: { taskType: 'user' }
         };
         
@@ -732,7 +817,7 @@ Only include properties that are relevant to the suggested node type.`;
           label: 'Process Task',
           reasoning: 'Standard activity',
           confidence: 0.5,
-          direction: 'right',
+          direction: selectedDirection,
           properties: { taskType: 'user' }
         };
     }
