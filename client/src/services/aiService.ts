@@ -1,3 +1,6 @@
+import { Node, Edge } from 'reactflow';
+import { BPMNService } from './bpmnService';
+
 const API_BASE_URL = process.env.NODE_ENV === 'production' ? '/api' : (process.env.REACT_APP_API_URL || 'http://localhost:3001');
 
 export interface ProcessModel {
@@ -510,12 +513,17 @@ ${process.elements.map(e => `- ${e.type}: ${e.label}`).join('\n')}
   async suggestNextNode(
     sourceNodeId: string, 
     currentProcess: ProcessModel,
-    context?: string,
-    selectedDirection?: string
-  ): Promise<AINodeSuggestion> {
+    context: string,
+    selectedDirection: 'right' | 'down' | 'left' | 'up',
+    nodes: Node[],
+    edges: Edge[]
+  ): Promise<AINodeSuggestion[]> {
     console.log('🤖 suggestNextNode called for node:', sourceNodeId);
     
     try {
+      // Generate BPMN XML for complete context
+      const bpmnXml = BPMNService.exportBPMN(nodes, edges, 'Current Process');
+      
       const response = await fetch(`${API_BASE_URL}/suggest-next-node`, {
         method: 'POST',
         headers: {
@@ -525,7 +533,8 @@ ${process.elements.map(e => `- ${e.type}: ${e.label}`).join('\n')}
           sourceNodeId, 
           currentProcess,
           context: context || 'Suggest the most logical next BPMN element',
-          selectedDirection: selectedDirection || 'right'
+          selectedDirection: selectedDirection || 'right',
+          bpmnXml: bpmnXml,
         }),
       });
 
@@ -535,8 +544,8 @@ ${process.elements.map(e => `- ${e.type}: ${e.label}`).join('\n')}
       }
 
       const data = await response.json();
-      console.log('✅ AI suggestion received:', data);
-      return data.suggestion;
+      console.log('✅ AI suggestions received:', data);
+      return data.suggestions;
     } catch (error) {
       console.error('❌ Error getting AI node suggestion:', error);
       
@@ -545,32 +554,32 @@ ${process.elements.map(e => `- ${e.type}: ${e.label}`).join('\n')}
     }
   }
 
-  private getFallbackSuggestion(sourceNodeId: string, currentProcess: ProcessModel): AINodeSuggestion {
+  private getFallbackSuggestion(sourceNodeId: string, currentProcess: ProcessModel): AINodeSuggestion[] {
     const sourceNode = currentProcess.elements.find(el => el.id === sourceNodeId);
     
     if (!sourceNode) {
-      return {
+      return [{
         nodeType: 'process',
         label: 'Process Task',
         reasoning: 'Default suggestion when source node not found',
         confidence: 0.5,
         direction: 'right'
-      };
+      }];
     }
 
     // Simple fallback logic based on node type
     switch (sourceNode.type) {
       case 'event':
         if (sourceNode.properties?.eventType === 'start') {
-          return {
+          return [{
             nodeType: 'process',
             label: 'First Process Step',
             reasoning: 'Start events are typically followed by the first business activity',
             confidence: 0.8,
             direction: 'right'
-          };
+          }];
         }
-        return {
+        return [{
           nodeType: 'event',
           subType: 'end',
           label: 'End Event',
@@ -578,36 +587,56 @@ ${process.elements.map(e => `- ${e.type}: ${e.label}`).join('\n')}
           confidence: 0.7,
           direction: 'right',
           properties: { eventType: 'end' }
-        };
+        }];
         
       case 'process':
-        return {
-          nodeType: 'gateway',
-          subType: 'exclusive',
-          label: 'Decision Gateway',
-          reasoning: 'Process tasks often need decision points',
-          confidence: 0.6,
-          direction: 'right',
-          properties: { gatewayType: 'exclusive' }
-        };
+        return [
+          {
+            nodeType: 'process',
+            subType: 'user',
+            label: 'Next Task',
+            reasoning: 'Continue the process with another task.',
+            confidence: 0.8,
+            direction: 'right',
+            properties: { taskType: 'user' }
+          },
+          {
+            nodeType: 'gateway',
+            subType: 'exclusive',
+            label: 'Decision Point',
+            reasoning: 'Tasks often lead to decision points.',
+            confidence: 0.7,
+            direction: 'right',
+            properties: { gatewayType: 'exclusive' }
+          },
+          {
+            nodeType: 'event',
+            subType: 'end',
+            label: 'End Process',
+            reasoning: 'Alternatively, this task could end the process.',
+            confidence: 0.5,
+            direction: 'right',
+            properties: { eventType: 'end' }
+          }
+        ];
         
       case 'gateway':
-        return {
+        return [{
           nodeType: 'process',
           label: 'Process Task',
           reasoning: 'Gateways split flow to process activities',
           confidence: 0.7,
           direction: 'down'
-        };
+        }];
         
       default:
-        return {
+        return [{
           nodeType: 'process',
           label: 'Process Task',
           reasoning: 'Standard process activity',
           confidence: 0.5,
           direction: 'right'
-        };
+        }];
     }
   }
 

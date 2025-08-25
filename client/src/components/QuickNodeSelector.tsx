@@ -14,10 +14,12 @@ import {
   Check,
   X,
   RefreshCw,
-  Edit3
+  Edit3,
+  InfoIcon
 } from 'lucide-react';
 import { aiService, AINodeSuggestion, ProcessModel } from '../services/aiService';
 import { aiNamingService, AINameSuggestion } from '../services/aiNamingService';
+import { BPMNService } from '../services/bpmnService';
 import { useDiagramStore } from '../stores/diagramStore';
 
 interface QuickNodeSelectorProps {
@@ -54,10 +56,10 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
   
   // AI Preview Mode state
   const [isAIMode, setIsAIMode] = useState(false);
-  const [aiSuggestion, setAiSuggestion] = useState<AINodeSuggestion | null>(null);
+  const [aiSuggestions, setAiSuggestions] = useState<AINodeSuggestion[] | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [showReasoning, setShowReasoning] = useState(false);
+  const [visibleReasoning, setVisibleReasoning] = useState<string | null>(null);
   
   // Smart Rename state
   const [isRenameMode, setIsRenameMode] = useState(false);
@@ -105,14 +107,10 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
     setAiError(null);
     try {
       const currentProcess = getCurrentProcess();
-      // Use the currently selected direction as context for AI
       const contextWithDirection = `User wants to place the next node ${selectedDirection} of the current node. Suggest the most logical next BPMN element for this direction.`;
-      const suggestion = await aiService.suggestNextNode(sourceNodeId, currentProcess, contextWithDirection, selectedDirection);
+      const suggestions = await aiService.suggestNextNode(sourceNodeId, currentProcess, contextWithDirection, selectedDirection, nodes, edges);
       
-      // Respect the user's selected direction instead of overriding it
-      suggestion.direction = selectedDirection;
-      
-      setAiSuggestion(suggestion);
+      setAiSuggestions(suggestions);
       setIsAIMode(true);
     } catch (error) {
       setAiError('Failed to get AI suggestion. Please try again.');
@@ -122,21 +120,19 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
     }
   };
 
-  const acceptAISuggestion = () => {
-    if (aiSuggestion) {
-      onSelectNode(aiSuggestion.nodeType, aiSuggestion.direction, aiSuggestion.subType, aiSuggestion.label);
-    }
+  const acceptAISuggestion = (suggestion: AINodeSuggestion) => {
+    onSelectNode(suggestion.nodeType, suggestion.direction, suggestion.subType, suggestion.label);
   };
 
-  const declineAISuggestion = () => {
+  const backToManual = () => {
     setIsAIMode(false);
-    setAiSuggestion(null);
+    setAiSuggestions(null);
     setAiError(null);
-    setShowReasoning(false);
+    setVisibleReasoning(null);
   };
 
   const retryAISuggestion = () => {
-    setShowReasoning(false);
+    setVisibleReasoning(null);
     requestAISuggestion();
   };
 
@@ -170,10 +166,10 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
   };
 
   // Helper function to get the icon for AI suggestion
-  const getAISuggestionIcon = () => {
-    if (!aiSuggestion) return Activity;
+  const getAISuggestionIcon = (suggestion: AINodeSuggestion) => {
+    if (!suggestion) return Activity;
     
-    const { nodeType, subType } = aiSuggestion;
+    const { nodeType, subType } = suggestion;
     
     switch (nodeType) {
       case 'process':
@@ -195,10 +191,10 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
   };
 
   // Helper function to get color for AI suggestion
-  const getAISuggestionColor = () => {
-    if (!aiSuggestion) return 'bg-blue-100 text-blue-800';
+  const getAISuggestionColor = (suggestion: AINodeSuggestion) => {
+    if (!suggestion) return 'bg-blue-100 text-blue-800';
     
-    const { nodeType, subType } = aiSuggestion;
+    const { nodeType, subType } = suggestion;
     
     switch (nodeType) {
       case 'process':
@@ -218,10 +214,10 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
   };
 
   // Helper function to get descriptive node type info
-  const getNodeTypeDescription = () => {
-    if (!aiSuggestion) return '';
+  const getNodeTypeDescription = (suggestion: AINodeSuggestion) => {
+    if (!suggestion) return '';
     
-    const { nodeType, subType, properties } = aiSuggestion;
+    const { nodeType, subType, properties } = suggestion;
     
     switch (nodeType) {
       case 'process':
@@ -472,65 +468,68 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
         </div>
         )}
 
-        {/* AI Preview Mode - Compact Visual Design */}
-        {isAIMode && aiSuggestion ? (
+        {/* AI Preview Mode - Multiple Suggestions */}
+        {isAIMode && aiSuggestions && aiSuggestions.length > 0 ? (
           <div className="mb-4">
-            {/* AI Suggested Node Display */}
-            <div className="mb-3">
-              <div className="text-xs font-medium text-gray-600 mb-2 flex items-center gap-1">
-                <Brain className="w-3 h-3 text-purple-600" />
-                AI Suggests:
-              </div>
-              
-              {/* Visual Node Preview */}
-              <div className={`p-3 rounded-lg border-2 border-dashed border-purple-300 ${getAISuggestionColor()} flex items-center gap-3`}>
-                <div className="flex-shrink-0">
-                  {React.createElement(getAISuggestionIcon(), { size: 24 })}
+            <div className="text-xs font-medium text-gray-600 mb-2 flex items-center gap-1">
+              <Brain className="w-3 h-3 text-purple-600" />
+              AI Suggestions:
+            </div>
+            
+            <div className="space-y-2 mb-3">
+              {aiSuggestions.map((suggestion, index) => (
+                <div key={index}>
+                  <button
+                    onClick={() => acceptAISuggestion(suggestion)}
+                    className={`w-full text-left p-3 rounded-lg border-2 border-dashed border-purple-300 ${getAISuggestionColor(suggestion)} flex items-center gap-3 transition-colors hover:border-purple-500`}
+                  >
+                    <div className="flex-shrink-0">
+                      {React.createElement(getAISuggestionIcon(suggestion), { size: 24 })}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{suggestion.label}</div>
+                      <div className="text-xs opacity-75">
+                        {getNodeTypeDescription(suggestion)}
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0 flex items-center gap-1">
+                      <div className="text-xs font-mono bg-white/50 px-1.5 py-0.5 rounded">
+                        {Math.round(suggestion.confidence * 100)}%
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setVisibleReasoning(visibleReasoning === suggestion.label ? null : suggestion.label);
+                        }}
+                        className="w-6 h-6 rounded-full bg-white bg-opacity-50 hover:bg-opacity-75 flex items-center justify-center transition-colors"
+                        title="Show/Hide AI reasoning"
+                      >
+                        <InfoIcon size={12} />
+                      </button>
+                    </div>
+                  </button>
+                  
+                  {/* Collapsible Reasoning */}
+                  {visibleReasoning === suggestion.label && (
+                    <div className="mt-1 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
+                      <strong>AI Reasoning:</strong> {suggestion.reasoning}
+                    </div>
+                  )}
                 </div>
-                <div className="flex-1">
-                  <div className="font-medium text-sm">{aiSuggestion.label}</div>
-                  <div className="text-xs opacity-75">
-                    {getNodeTypeDescription()}
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowReasoning(!showReasoning)}
-                  className="flex-shrink-0 w-6 h-6 rounded-full bg-white bg-opacity-50 hover:bg-opacity-75 flex items-center justify-center transition-colors"
-                  title={showReasoning ? "Hide reasoning" : "Show AI reasoning"}
-                >
-                  <span className={`text-xs transform transition-transform ${showReasoning ? 'rotate-180' : ''}`}>
-                    ▼
-                  </span>
-                </button>
-              </div>
-              
-              {/* Collapsible Reasoning */}
-              {showReasoning && (
-                <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
-                  <strong>AI Reasoning:</strong> {aiSuggestion.reasoning}
-                </div>
-              )}
+              ))}
             </div>
 
             {/* Action Buttons */}
             <div className="flex gap-2">
               <button
-                onClick={acceptAISuggestion}
-                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-green-500 hover:bg-green-600 text-white text-sm rounded-md transition-colors"
+                onClick={backToManual}
+                className="flex-1 px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white text-sm rounded-md transition-colors"
               >
-                <Check className="w-4 h-4" />
-                Accept
-              </button>
-              <button
-                onClick={declineAISuggestion}
-                className="flex items-center gap-1 px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white text-sm rounded-md transition-colors"
-              >
-                <X className="w-4 h-4" />
-                Decline
+                Manual
               </button>
               <button
                 onClick={retryAISuggestion}
-                className="flex items-center gap-1 px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white text-sm rounded-md transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white text-sm rounded-md transition-colors"
                 disabled={isLoadingAI}
               >
                 <RefreshCw className={`w-4 h-4 ${isLoadingAI ? 'animate-spin' : ''}`} />

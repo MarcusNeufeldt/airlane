@@ -615,7 +615,7 @@ Format your response in clear markdown with proper headers and bullet points.`;
     };
   }
 
-  async suggestNextNode(sourceNodeId, currentProcess, context = 'Suggest the most logical next BPMN element', selectedDirection = 'right') {
+  async suggestNextNode(sourceNodeId, currentProcess, context = 'Suggest the most logical next BPMN element', selectedDirection = 'right', bpmnXml = null) {
     try {
       console.log('🤖 Starting AI node suggestion for:', sourceNodeId, 'direction:', selectedDirection);
       
@@ -625,37 +625,23 @@ Format your response in clear markdown with proper headers and bullet points.`;
         throw new Error(`Source node with ID ${sourceNodeId} not found`);
       }
 
-      // Analyze the context around the source node
-      const connectedFlows = currentProcess.flows.filter(flow => 
-        flow.source === sourceNodeId || flow.target === sourceNodeId
-      );
-
       // Enhanced: Analyze directional context
       const directionAnalysis = this.analyzeDirectionalContext(sourceNodeId, selectedDirection, currentProcess);
 
-      const prompt = `You are an expert BPMN process designer with spatial awareness. Given the current process context and user's directional intent, suggest the most logical next BPMN element.
+      const prompt = `You are an expert BPMN process designer with spatial and business context awareness. Given the current process, user's directional intent, and the full BPMN XML schema, suggest 2-3 of the most logical next BPMN elements.
+
+**COMPLETE BPMN XML SCHEMA:**
+${bpmnXml || 'BPMN XML not available. Rely on the element list below.'}
+
+**ANALYSIS INSTRUCTIONS:**
+1. **Parse the BPMN XML** to understand the complete business process structure, including pools, lanes, and sequence logic.
+2. **Identify the business domain** (e.g., finance, logistics, healthcare) from the process context.
+3. **Analyze the user's immediate intent** based on the source node and their chosen direction.
 
 **🧭 CRITICAL: USER'S DIRECTIONAL INTENT**
 ${directionAnalysis.spatialContext}
-
-**Direction Analysis:**
 - Selected Direction: ${directionAnalysis.selectedDirection}
 - Intent Classification: ${directionAnalysis.directionIntent}
-- Existing Outgoing Connections: ${directionAnalysis.outgoingConnectionCount}
-
-${directionAnalysis.directionIntent === 'NEW_BRANCH' ? 
-`**🌟 NEW BRANCH CONTEXT:**
-This is a NEW BRANCH from an existing node. Consider:
-- Error handling and exception paths
-- Alternative business flows and scenarios  
-- Parallel activities that can run concurrently
-- Approval/rejection decision paths
-- Escalation or fallback procedures
-- Data validation or quality checks
-
-Focus on nodes that CREATE ALTERNATIVES rather than continue the main sequence.` :
-`**➡️ EXISTING FLOW EXTENSION:**
-Continuing an established process flow in the natural sequence.`}
 
 **Source Node (where user clicked):**
 - ID: ${sourceNode.id}
@@ -663,35 +649,36 @@ Continuing an established process flow in the natural sequence.`}
 - Label: ${sourceNode.label}
 - Properties: ${JSON.stringify(sourceNode.properties || {}, null, 2)}
 
-**Connected Flows:**
-${connectedFlows.map(flow => `- ${flow.type}: ${flow.source} → ${flow.target} ${flow.label ? `(${flow.label})` : ''}`).join('\n')}
+**TASK:**
+Based on the full BPMN XML, directional intent, and business context, suggest 2-3 contextually appropriate and diverse next elements to add.
+- Rank the suggestions by confidence, with the most likely option first.
+- Keep the reasoning for each suggestion very brief (maximum 1-2 sentences).
+- Ensure suggestions follow BPMN 2.0 best practices.
 
-**Full Process Elements:**
-${currentProcess.elements.map(el => `- ${el.type}: ${el.label} (${el.id})`).join('\n')}
-
-**Additional Context:** ${context}
-
-Based on BPMN best practices, the directional intent analysis, and current process state, suggest the next most logical element to add.
-
-**IMPORTANT:** Keep the reasoning very brief (maximum 1-2 sentences). Focus on the core logic, not detailed explanations.
-
-Respond with a JSON object in this exact format:
+**RESPONSE FORMAT:**
+Respond with a single JSON object in this exact format. Do not include any other text or markdown.
 {
-  "nodeType": "process|event|gateway|data-object",
-  "subType": "start|end|intermediate|exclusive|parallel|inclusive|user|service|manual|input|output|storage|reference",
-  "label": "Suggested node name",
-  "reasoning": "Very brief explanation (1-2 sentences max)",
-  "confidence": 0.8,
-  "direction": "right|down|left|up",
-  "properties": {
-    "eventType": "start|intermediate|end",
-    "gatewayType": "exclusive|parallel|inclusive|event-based|complex",
-    "taskType": "user|service|manual|script|business-rule|send|receive",
-    "dataType": "input|output|collection|storage|reference"
-  }
-}
-
-Only include properties that are relevant to the suggested node type.`;
+  "suggestions": [
+    {
+      "nodeType": "process|event|gateway|data-object",
+      "subType": "start|end|intermediate|exclusive|parallel|inclusive|user|service|manual|input|output|storage|reference",
+      "label": "Suggested node name 1",
+      "reasoning": "Very brief explanation for suggestion 1.",
+      "confidence": 0.9,
+      "direction": "right|down|left|up",
+      "properties": { "taskType": "user" }
+    },
+    {
+      "nodeType": "gateway",
+      "subType": "exclusive",
+      "label": "Suggested node name 2",
+      "reasoning": "Very brief explanation for suggestion 2.",
+      "confidence": 0.7,
+      "direction": "right|down|left|up",
+      "properties": { "gatewayType": "exclusive" }
+    }
+  ]
+}`;
 
       const response = await axios.post(`${this.baseURL}/chat/completions`, {
         model: this.defaultModel,
@@ -702,7 +689,7 @@ Only include properties that are relevant to the suggested node type.`;
           },
           { role: "user", content: prompt }
         ],
-        temperature: 0.3, // Lower temperature for more consistent suggestions
+        temperature: 0.4, // Balanced temperature for creative but consistent suggestions
         ...this.getReasoningConfig()
       }, {
         headers: this.getSafeHeaders({
@@ -715,26 +702,26 @@ Only include properties that are relevant to the suggested node type.`;
       console.log('🤖 AI suggestion raw response:', responseContent);
 
       // Parse the JSON response
-      let suggestion;
+      let suggestions;
       try {
         // Extract JSON from the response (in case it's wrapped in markdown)
         const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
         const jsonString = jsonMatch ? jsonMatch[0] : responseContent;
-        suggestion = JSON.parse(jsonString);
+        suggestions = JSON.parse(jsonString).suggestions;
       } catch (parseError) {
-        console.error('❌ Failed to parse AI suggestion JSON:', parseError);
-        // Fallback suggestion
-        suggestion = this.getFallbackSuggestion(sourceNode, selectedDirection);
+        console.error('❌ Failed to parse AI suggestions JSON:', parseError);
+        // Fallback to multiple suggestions
+        suggestions = this.getFallbackSuggestion(sourceNode, selectedDirection);
       }
 
-      // Validate and clean the suggestion
-      suggestion = this.validateSuggestion(suggestion);
+      // Validate and clean all suggestions
+      suggestions = suggestions.map(this.validateSuggestion);
       
-      console.log('✅ AI node suggestion generated:', suggestion);
-      return suggestion;
+      console.log('✅ AI node suggestions generated:', suggestions);
+      return suggestions;
     } catch (error) {
       console.error('❌ AI Node Suggestion Error:', error.response?.data || error.message);
-      // Return fallback suggestion instead of throwing
+      // Return fallback suggestions instead of throwing
       const sourceNode = currentProcess.elements.find(el => el.id === sourceNodeId);
       return this.getFallbackSuggestion(sourceNode, selectedDirection);
     }
@@ -743,13 +730,13 @@ Only include properties that are relevant to the suggested node type.`;
   // Helper method to create fallback suggestions
   getFallbackSuggestion(sourceNode, selectedDirection = 'right') {
     if (!sourceNode) {
-      return {
+      return [{
         nodeType: 'process',
         label: 'Process Task',
         reasoning: 'Default suggestion when source node not found',
         confidence: 0.5,
         direction: selectedDirection
-      };
+      }];
     }
 
     // Direction-aware heuristics
@@ -757,30 +744,41 @@ Only include properties that are relevant to the suggested node type.`;
     
     if (isNewBranch && sourceNode.type === 'process') {
       // For left/up from process tasks, suggest alternative paths
-      return {
-        nodeType: 'gateway',
-        subType: 'exclusive',
-        label: 'Exception Gateway',
-        reasoning: 'Creating alternative path for error handling or exceptions',
-        confidence: 0.8,
-        direction: selectedDirection,
-        properties: { gatewayType: 'exclusive' }
-      };
+      return [
+        {
+          nodeType: 'gateway',
+          subType: 'exclusive',
+          label: 'Exception Gateway',
+          reasoning: 'Creating alternative path for error handling or exceptions',
+          confidence: 0.8,
+          direction: selectedDirection,
+          properties: { gatewayType: 'exclusive' }
+        },
+        {
+          nodeType: 'process',
+          subType: 'user',
+          label: 'Manual Review',
+          reasoning: 'Alternative task for special cases.',
+          confidence: 0.6,
+          direction: selectedDirection,
+          properties: { taskType: 'user' }
+        }
+      ];
     }
 
     switch (sourceNode.type) {
       case 'event':
         if (sourceNode.properties?.eventType === 'start') {
-                  return {
-          nodeType: 'process',
-          label: 'First Process Step',
-          reasoning: 'Start events need a first business activity',
-          confidence: 0.8,
-          direction: selectedDirection,
-          properties: { taskType: 'user' }
-        };
+          return [{
+            nodeType: 'process',
+            label: 'First Process Step',
+            reasoning: 'Start events need a first business activity',
+            confidence: 0.8,
+            direction: selectedDirection,
+            properties: { taskType: 'user' }
+          }];
         }
-        return {
+        return [{
           nodeType: 'event',
           subType: 'end',
           label: 'End Event',
@@ -788,38 +786,58 @@ Only include properties that are relevant to the suggested node type.`;
           confidence: 0.7,
           direction: selectedDirection,
           properties: { eventType: 'end' }
-        };
+        }];
         
       case 'process':
-        return {
-          nodeType: 'gateway',
-          subType: 'exclusive',
-          label: 'Decision Gateway',
-          reasoning: 'Tasks often need decision points',
-          confidence: 0.6,
-          direction: selectedDirection,
-          properties: { gatewayType: 'exclusive' }
-        };
+        return [
+          {
+            nodeType: 'process',
+            subType: 'user',
+            label: 'Next Task',
+            reasoning: 'Continue the process with another task.',
+            confidence: 0.8,
+            direction: selectedDirection,
+            properties: { taskType: 'user' }
+          },
+          {
+            nodeType: 'gateway',
+            subType: 'exclusive',
+            label: 'Decision Point',
+            reasoning: 'Tasks often lead to decision points.',
+            confidence: 0.7,
+            direction: selectedDirection,
+            properties: { gatewayType: 'exclusive' }
+          },
+          {
+            nodeType: 'event',
+            subType: 'end',
+            label: 'End Process',
+            reasoning: 'Alternatively, this task could end the process.',
+            confidence: 0.5,
+            direction: selectedDirection,
+            properties: { eventType: 'end' }
+          }
+        ];
         
       case 'gateway':
-        return {
+        return [{
           nodeType: 'process',
           label: 'Process Task',
           reasoning: 'Gateways split to activities',
           confidence: 0.7,
           direction: selectedDirection,
           properties: { taskType: 'user' }
-        };
+        }];
         
       default:
-        return {
+        return [{
           nodeType: 'process',
           label: 'Process Task',
           reasoning: 'Standard activity',
           confidence: 0.5,
           direction: selectedDirection,
           properties: { taskType: 'user' }
-        };
+        }];
     }
   }
 
