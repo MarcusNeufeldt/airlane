@@ -682,31 +682,27 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
     const sourceNodeId = quickNodeSelector.sourceNodeId;
     const currentDirection = direction; // Capture direction for closure
     
+    // Store the current nodes count to find the new node after creation
+    const nodeCountBefore = nodes.length;
+    
     // Create the new node - the store will generate the ID
     addNode(nodeType as any, finalPosition, options);
 
     // Create automatic connection between source and new node
-    // We'll find the most recently created node as the target
     setTimeout(() => {
-      // Get updated nodes from the store - find the newest node
       const allNodes = useDiagramStore.getState().nodes;
       
-      // Find the most recently created node (highest timestamp in ID)
-      const newNode = allNodes
-        .filter(node => node.id !== sourceNodeId) // Exclude source node
-        .sort((a, b) => {
-          // Extract timestamp from node ID (format: "type-timestamp")
-          const aTime = parseInt(a.id.split('-').pop() || '0');
-          const bTime = parseInt(b.id.split('-').pop() || '0');
-          return bTime - aTime; // Sort by newest first
-        })[0]; // Get the newest node
+      // Find the newly added node (should be the one that wasn't there before)
+      const newNodes = allNodes.filter(node => !nodes.some(oldNode => oldNode.id === node.id));
+      const targetNode = newNodes[0]; // Should be the newly created node
       
-      console.log('🔗 Connection Debug - All nodes:', allNodes.map(n => ({ id: n.id, pos: n.position })));
-      console.log('🔗 Connection Debug - Looking for new node at position:', finalPosition);
       console.log('🔗 Connection Debug - Source node ID:', sourceNodeId);
-      console.log('🔗 Connection Debug - Selected newest node:', newNode);
+      console.log('🔗 Connection Debug - Nodes before:', nodeCountBefore);
+      console.log('🔗 Connection Debug - Nodes after:', allNodes.length);
+      console.log('🔗 Connection Debug - New nodes found:', newNodes.length);
+      console.log('🔗 Connection Debug - Target node:', targetNode?.id);
       
-      if (newNode) {
+      if (targetNode) {
         // Determine the correct source and target handles based on direction and node types
         let sourceHandle: string = 'output-right'; // Default fallback
         let targetHandle: string = 'input-left';   // Default fallback
@@ -768,8 +764,8 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
         }
         
         // Target handle logic (for the new node)
-        if (newNode.type === 'event') {
-          const newEventData = newNode.data as any;
+        if (targetNode.type === 'event') {
+          const newEventData = targetNode.data as any;
           if (newEventData.eventType === 'end') {
             targetHandle = currentDirection === 'right' ? 'end-left' : 'end-top';
           } else if (newEventData.eventType === 'intermediate') {
@@ -783,7 +779,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
             console.warn('⚠️  Attempting to connect TO a start event - this is not allowed in BPMN');
             targetHandle = 'input-left'; // Use fallback to prevent connection
           }
-        } else if (newNode.type === 'data-object') {
+        } else if (targetNode.type === 'data-object') {
           // Data objects use association handles
           switch (currentDirection) {
             case 'right':
@@ -826,7 +822,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
         let markerEnd: any = { type: 'arrowclosed' as const };
         
         // Use association edge for data objects
-        if (currentSourceNode?.type === 'data-object' || newNode.type === 'data-object') {
+        if (currentSourceNode?.type === 'data-object' || targetNode.type === 'data-object') {
           edgeType = 'association';
           markerEnd = undefined; // Association edges typically don't have arrow markers
         }
@@ -834,7 +830,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
         const newEdge = {
           id: `edge-${Date.now()}`,
           source: sourceNodeId,
-          target: newNode.id,
+          target: targetNode.id,
           sourceHandle: sourceHandle,
           targetHandle: targetHandle,
           type: edgeType,
@@ -846,9 +842,9 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
           targetHandle, 
           direction: currentDirection,
           sourceNodeType: currentSourceNode?.type,
-          targetNodeType: newNode.type,
+          targetNodeType: targetNode.type,
           sourceId: sourceNodeId,
-          targetId: newNode.id,
+          targetId: targetNode.id,
           edgeObject: newEdge
         });
         
