@@ -316,7 +316,7 @@ Respond ONLY with valid JSON matching the required BPMN process format. Do not i
   }
 
   // Chat with AI about the process (with function calling)
-  async chatAboutProcess(userMessage, currentProcess = null, conversationHistory = [], images = []) {
+  async chatAboutProcess(userMessage, currentProcess = null, conversationHistory = [], images = [], bpmnXml = null) {
     try {
       console.log('🔍 AI Service Debug - images parameter:', images);
       console.log('🔍 AI Service Debug - images type:', typeof images);
@@ -356,6 +356,9 @@ You have access to these tools:
 1. generate_business_process - Create a new BPMN process from scratch.
 2. modify_existing_process - Modify the current process.
 3. analyze_current_process - Analyze the current process and provide insights.
+
+**COMPLETE BPMN XML SCHEMA:**
+${bpmnXml || 'BPMN XML not available. Using structured process data below.'}
 
 Current process on the canvas:
 ${currentProcess ? JSON.stringify(currentProcess, null, 2) : 'No process is on the canvas yet.'}`;

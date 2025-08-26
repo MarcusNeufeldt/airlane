@@ -586,10 +586,12 @@ export class BPMNService {
   <process id="process_${Date.now()}" name="${processName}" isExecutable="false">
 `;
 
-    // Add lanes and pools first
+    // Add lanes and pools first - handle both separate lane/pool nodes AND pool-with-lanes nodes
     const lanes = nodes.filter(n => n.type === 'lane');
     const pools = nodes.filter(n => n.type === 'pool');
+    const poolsWithLanes = nodes.filter(n => n.type === 'pool-with-lanes');
     
+    // Handle separate pool nodes
     if (pools.length > 0) {
       pools.forEach(pool => {
         xml += `    <participant id="${pool.id}" name="${pool.data.label || pool.id}" processRef="process_${Date.now()}" />
@@ -597,12 +599,76 @@ export class BPMNService {
       });
     }
     
-    if (lanes.length > 0) {
+    // Handle pool-with-lanes nodes - extract lanes data
+    const allLanes: Array<{id: string, name: string, flowNodeRefs: string[], poolId?: string}> = [];
+    
+    // Add lanes from separate lane nodes
+    lanes.forEach(lane => {
+      allLanes.push({
+        id: lane.id,
+        name: lane.data.label || lane.id,
+        flowNodeRefs: [], // Will be populated later
+        poolId: undefined
+      });
+    });
+    
+    // Add lanes from pool-with-lanes nodes
+    poolsWithLanes.forEach(poolWithLanes => {
+      if (poolWithLanes.data.lanes && poolWithLanes.data.lanes.length > 0) {
+        poolWithLanes.data.lanes.forEach((laneData: any) => {
+          allLanes.push({
+            id: laneData.id,
+            name: laneData.name,
+            flowNodeRefs: [], // Will be populated later
+            poolId: poolWithLanes.id
+          });
+        });
+      }
+    });
+    
+    // Find which nodes belong to which lanes
+    nodes.forEach(node => {
+      if (node.type === 'lane' || node.type === 'pool' || node.type === 'pool-with-lanes') return;
+      
+      // Check if node has lane assignment data
+      if (node.data?.laneId) {
+        const lane = allLanes.find(l => l.id === node.data.laneId);
+        if (lane) {
+          lane.flowNodeRefs.push(node.id);
+        }
+      }
+      // Also check if node is positioned within a pool-with-lanes (child nodes)
+      else if (node.parentNode) {
+        const parentPool = poolsWithLanes.find(p => p.id === node.parentNode);
+        if (parentPool && parentPool.data.lanes) {
+          // Find which lane this node belongs to based on Y position
+          const nodeY = node.position.y;
+          let currentY = 0;
+          for (const laneData of parentPool.data.lanes) {
+            if (nodeY >= currentY && nodeY < currentY + laneData.height) {
+              const lane = allLanes.find(l => l.id === laneData.id);
+              if (lane) {
+                lane.flowNodeRefs.push(node.id);
+              }
+              break;
+            }
+            currentY += laneData.height;
+          }
+        }
+      }
+    });
+    
+    // Export lanes if any exist
+    if (allLanes.length > 0) {
       xml += '    <laneSet>\n';
-      lanes.forEach(lane => {
-        xml += `      <lane id="${lane.id}" name="${lane.data.label || lane.id}">
+      allLanes.forEach(lane => {
+        xml += `      <lane id="${lane.id}" name="${lane.name}">
 `;
-        // Add flow node refs for nodes in this lane (simplified - would need proper lane assignment logic)
+        // Add flow node references
+        lane.flowNodeRefs.forEach(nodeId => {
+          xml += `        <flowNodeRef>${nodeId}</flowNodeRef>
+`;
+        });
         xml += '      </lane>\n';
       });
       xml += '    </laneSet>\n';
@@ -610,7 +676,7 @@ export class BPMNService {
     
     // Process other nodes
     nodes.forEach(node => {
-      if (node.type === 'lane' || node.type === 'pool') return;
+      if (node.type === 'lane' || node.type === 'pool' || node.type === 'pool-with-lanes') return;
       
       const nodeId = node.id;
       const label = node.data.label || nodeId;
@@ -771,14 +837,22 @@ export class BPMNService {
     
     // Add collaboration for message flows
     const messageFlows = edges.filter(e => e.type === 'message-flow');
-    if (messageFlows.length > 0) {
+    if (messageFlows.length > 0 || poolsWithLanes.length > 0) {
       xml += `  <collaboration id="collaboration_${Date.now()}">
 `;
       
-      // Add participants
+      // Add participants from separate pool nodes
       if (pools.length > 0) {
         pools.forEach(pool => {
           xml += `    <participant id="${pool.id}_ref" processRef="process_${Date.now()}" />
+`;
+        });
+      }
+      
+      // Add participants from pool-with-lanes nodes
+      if (poolsWithLanes.length > 0) {
+        poolsWithLanes.forEach(poolWithLanes => {
+          xml += `    <participant id="${poolWithLanes.id}" name="${poolWithLanes.data.label || poolWithLanes.data.participant || poolWithLanes.id}" processRef="process_${Date.now()}" />
 `;
         });
       }
@@ -799,8 +873,16 @@ export class BPMNService {
     
     // Add shapes
     nodes.forEach(node => {
-      const width = node.data?.width || (node.type === 'gateway' ? 40 : node.type === 'event' ? 30 : 100);
-      const height = node.data?.height || (node.type === 'gateway' ? 40 : node.type === 'event' ? 30 : 80);
+      let width, height;
+      
+      if (node.type === 'pool-with-lanes') {
+        // Use the stored dimensions for pool-with-lanes
+        width = node.data?.width || 600;
+        height = node.data?.height || 400;
+      } else {
+        width = node.data?.width || (node.type === 'gateway' ? 40 : node.type === 'event' ? 30 : 100);
+        height = node.data?.height || (node.type === 'gateway' ? 40 : node.type === 'event' ? 30 : 80);
+      }
       
       xml += `      <bpmndi:BPMNShape id="${node.id}_gui" bpmnElement="${node.id}">
         <omgdc:Bounds x="${Math.round(node.position.x)}" y="${Math.round(node.position.y)}" width="${width}" height="${height}" />

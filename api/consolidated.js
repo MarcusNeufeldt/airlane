@@ -1142,7 +1142,7 @@ module.exports = async (req, res) => {
     if (method === 'POST' && url.includes('/diagram-chat')) {
       const urlParams = new URLSearchParams(url.split('?')[1] || '');
       const diagramId = urlParams.get('id');
-              const { message, currentProcess, images } = body;
+      const { message, currentProcess, images, bpmnXml } = body;
         
         console.log('🔍 Debug - images parameter:', images);
         console.log('🔍 Debug - images type:', typeof images);
@@ -1194,9 +1194,12 @@ module.exports = async (req, res) => {
         // 3. Call the AI service with full context
         const aiService = new AIService();
         
-        // Always use process-focused method
+        // Always use process-focused method with BPMN XML context
         let aiResponse;
-        aiResponse = await aiService.chatAboutProcess(message, currentProcess || null, conversationHistory, images);
+        if (bpmnXml) {
+          console.log('🔧 Including BPMN XML context for enhanced AI understanding, length:', bpmnXml.length);
+        }
+        aiResponse = await aiService.chatAboutProcess(message, currentProcess || null, conversationHistory, images, bpmnXml);
         
         console.log('🤖 AI response received');
         console.log('🔍 Response type:', aiResponse.type);
