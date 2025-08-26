@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles, RefreshCw, RotateCcw, Paperclip, X } from 'lucide-react';
 import { aiService, ChatMessage, ProcessModel, ProcessElement, ProcessFlow } from '../services/aiService';
+import { BPMNService } from '../services/bpmnService';
 import { useDiagramStore } from '../stores/diagramStore';
 
 interface AIChatPanelProps {
@@ -452,15 +453,28 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
 
     try {
       const currentProcess = getCurrentProcess();
+      
+      // Generate BPMN XML for complete context (like AI Smart Node and AI Renaming)
+      let bpmnXml: string | undefined;
+      try {
+        if (nodes.length > 0) {
+          bpmnXml = BPMNService.exportBPMN(nodes, edges, 'Current Process');
+          console.log('🔧 Generated BPMN XML for AI context:', bpmnXml.substring(0, 200) + '...');
+        }
+      } catch (error) {
+        console.warn('🔧 Failed to generate BPMN XML for AI context:', error);
+      }
+      
       console.log('🎯 Sending message to AI via stateful chat:', currentInput);
       console.log('📊 Current process:', currentProcess);
       console.log('📍 Diagram ID:', currentDiagramId);
       console.log('🖼️ Images attached:', currentImages.length);
+      console.log('🔧 BPMN XML context:', !!bpmnXml);
 
       const imageDataUrls = currentImages.length > 0 ? await Promise.all(currentImages.map(img => convertImageToBase64(img.file))) : undefined;
 
-      // This is the key change: use the stateful endpoint
-      const response = await aiService.postChatMessage(currentDiagramId, currentInput, currentProcess, imageDataUrls);
+      // This is the key change: use the stateful endpoint with BPMN XML context
+      const response = await aiService.postChatMessage(currentDiagramId, currentInput, currentProcess, imageDataUrls, bpmnXml);
       
       console.log('📦 Response from stateful chat:', response);
 
