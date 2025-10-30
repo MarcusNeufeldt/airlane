@@ -13,9 +13,10 @@ interface ToolbarProps {
   showMiniMap?: boolean;
   onToggleMiniMap?: () => void;
   onOpenSimulation?: () => void;
+  onShowKeyboardShortcuts?: () => void;
 }
 
-export const ToolbarClean: React.FC<ToolbarProps> = ({ onOpenAIChat, showMiniMap, onToggleMiniMap, onOpenSimulation }) => {
+export const ToolbarClean: React.FC<ToolbarProps> = ({ onOpenAIChat, showMiniMap, onToggleMiniMap, onOpenSimulation, onShowKeyboardShortcuts }) => {
   const { importDiagram, addNotification } = useDiagramStore();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -70,11 +71,12 @@ export const ToolbarClean: React.FC<ToolbarProps> = ({ onOpenAIChat, showMiniMap
           <QuickActions onOpenAIChat={onOpenAIChat} />
           
           {/* Consolidated Menu - Tertiary */}
-          <ToolbarMenus 
-            fileInputRef={fileInputRef} 
+          <ToolbarMenus
+            fileInputRef={fileInputRef}
             onFileUpload={handleFileUpload}
-            showMiniMap={showMiniMap} 
-            onToggleMiniMap={onToggleMiniMap} 
+            showMiniMap={showMiniMap}
+            onToggleMiniMap={onToggleMiniMap}
+            onShowKeyboardShortcuts={onShowKeyboardShortcuts}
           />
         </div>
 

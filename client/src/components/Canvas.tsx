@@ -34,6 +34,7 @@ import { ZoomToolbar } from './ZoomToolbar';
 import { ProcessContextMenu } from './ProcessContextMenu';
 import { QuickNodeSelector } from './QuickNodeSelector';
 import { AlignmentGuides } from './AlignmentGuides';
+import { KeyboardShortcutsDialog } from './KeyboardShortcutsDialog';
 
 const nodeTypes: NodeTypes = {
   process: ProcessNode,
@@ -55,9 +56,12 @@ const edgeTypes: EdgeTypes = {
 
 interface CanvasProps {
   showMiniMap?: boolean;
+  showKeyboardShortcuts?: boolean;
+  onShowKeyboardShortcuts?: () => void;
+  onCloseKeyboardShortcuts?: () => void;
 }
 
-export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
+export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true, showKeyboardShortcuts = false, onShowKeyboardShortcuts, onCloseKeyboardShortcuts }) => {
   const {
     nodes,
     edges,
@@ -292,11 +296,7 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
       // Ctrl+? to show keyboard shortcuts
       if (isCtrlOrCmd && event.key === '?') {
         event.preventDefault();
-        // Trigger keyboard shortcuts dialog
-        const shortcutsButton = document.querySelector('[title*="keyboard shortcuts"], [title*="Shortcuts"]') as HTMLButtonElement;
-        if (shortcutsButton) {
-          shortcutsButton.click();
-        }
+        onShowKeyboardShortcuts?.();
         return;
       }
 
@@ -995,6 +995,12 @@ export const Canvas: React.FC<CanvasProps> = ({ showMiniMap = true }) => {
           onClose={() => setQuickNodeSelector(null)}
         />
       )}
+
+      {/* Keyboard Shortcuts Dialog */}
+      <KeyboardShortcutsDialog
+        isOpen={showKeyboardShortcuts}
+        onClose={() => onCloseKeyboardShortcuts?.()}
+      />
     </div>
   );
 };

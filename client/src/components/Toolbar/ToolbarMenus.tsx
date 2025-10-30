@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { ChevronDown, Settings, FileText, Layout, Grid3x3, Users, Maximize2, Save, Upload, Download, Eye, StickyNote, Square, Circle, Diamond } from 'lucide-react';
+import { ChevronDown, Settings, FileText, Layout, Grid3x3, Users, Maximize2, Save, Upload, Download, Eye, StickyNote, Square, Circle, Diamond, Keyboard } from 'lucide-react';
 import { useDiagramStore } from '../../stores/diagramStore';
 import { userService } from '../../services/userService';
 import { exportCurrentViewportAsPNG, exportFullDiagramAsPNG } from '../../lib/exportUtils';
@@ -10,13 +10,15 @@ interface ToolbarMenusProps {
   onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
   showMiniMap?: boolean;
   onToggleMiniMap?: () => void;
+  onShowKeyboardShortcuts?: () => void;
 }
 
-export const ToolbarMenus: React.FC<ToolbarMenusProps> = ({ 
-  fileInputRef, 
-  onFileUpload, 
-  showMiniMap, 
-  onToggleMiniMap 
+export const ToolbarMenus: React.FC<ToolbarMenusProps> = ({
+  fileInputRef,
+  onFileUpload,
+  showMiniMap,
+  onToggleMiniMap,
+  onShowKeyboardShortcuts
 }) => {
   const {
     nodes,
@@ -344,6 +346,28 @@ export const ToolbarMenus: React.FC<ToolbarMenusProps> = ({
                 >
                   <Maximize2 size={16} className="text-gray-500" />
                   <span>{showMiniMap ? 'Hide' : 'Show'} Mini Map</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-100 my-2"></div>
+
+            {/* Help Section */}
+            <div className="px-3 py-1">
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Help</div>
+              <div className="space-y-1">
+                <button
+                  onClick={() => {
+                    onShowKeyboardShortcuts?.();
+                    setShowMainMenu(false);
+                  }}
+                  className="w-full text-left px-2 py-2 text-sm hover:bg-gray-50 flex items-center space-x-3 rounded"
+                >
+                  <Keyboard size={16} className="text-gray-500" />
+                  <div className="flex items-center justify-between w-full">
+                    <span>Keyboard Shortcuts</span>
+                    <kbd className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded font-mono">Ctrl+?</kbd>
+                  </div>
                 </button>
               </div>
             </div>

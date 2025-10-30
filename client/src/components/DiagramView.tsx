@@ -28,6 +28,7 @@ export const DiagramView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showMiniMap, setShowMiniMap] = useState(true);
   const [isSimulationOpen, setIsSimulationOpen] = useState(false);
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
 
   // Initialize user if not logged in
   useEffect(() => {
@@ -241,13 +242,19 @@ export const DiagramView: React.FC = () => {
             showMiniMap={showMiniMap}
             onToggleMiniMap={() => setShowMiniMap(!showMiniMap)}
             onOpenSimulation={() => setIsSimulationOpen(true)}
+            onShowKeyboardShortcuts={() => setShowKeyboardShortcuts(true)}
           />
         </div>
       </div>
       
       <div className="flex flex-1 overflow-hidden relative">
         <ReactFlowProvider>
-          <Canvas showMiniMap={showMiniMap} />
+          <Canvas
+            showMiniMap={showMiniMap}
+            showKeyboardShortcuts={showKeyboardShortcuts}
+            onShowKeyboardShortcuts={() => setShowKeyboardShortcuts(true)}
+            onCloseKeyboardShortcuts={() => setShowKeyboardShortcuts(false)}
+          />
           <PropertyPanel />
           <CollaboratorCursors />
           
