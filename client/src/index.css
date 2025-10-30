@@ -32,67 +32,18 @@ code {
   animation: slide-in 0.3s ease-out;
 }
 
-/* --- Custom Z-Index Layering for BPMN Process Modeling --- */
+/* --- ReactFlow Z-Index Notes --- */
 
 /*
-  LAYERING HIERARCHY (bottom to top):
-  1. Background elements (pools, lanes) - z-index: 1-5
-  2. Connections/Edges - z-index: 10
-  3. Process elements (tasks, events, gateways) - z-index: 20-30
-  4. Annotations and data objects - z-index: 40-50
-  5. Sticky notes - z-index: 50
+  ReactFlow manages z-index internally via the node.zIndex property.
+  Using CSS z-index rules can conflict with ReactFlow's internal system.
+
+  Instead, set zIndex directly on nodes:
+  - Background elements (pools, lanes): zIndex < 0
+  - Edges: default (around 0)
+  - Process elements: zIndex > 0
+
+  This allows ReactFlow's native layering to work correctly.
 */
-
-/* Set a z-index for the container of all edges. This is our middle layer. */
-.react-flow__edges {
-  z-index: 10;
-}
-
-/* Background elements - BELOW edges */
-.react-flow__node-pool,
-.react-flow__node-pool-with-lanes {
-  z-index: 1 !important;
-}
-
-.react-flow__node-lane {
-  z-index: 2 !important;
-}
-
-.react-flow__node-shape {
-  z-index: 3 !important;
-}
-
-/* Process elements - ABOVE edges */
-.react-flow__node-process {
-  z-index: 20 !important;
-}
-
-.react-flow__node-event {
-  z-index: 25 !important;
-}
-
-.react-flow__node-gateway {
-  z-index: 25 !important;
-}
-
-/* Data objects and annotations - ABOVE process elements */
-.react-flow__node-data-object {
-  z-index: 40 !important;
-}
-
-/* Sticky notes should appear on top of most elements */
-.react-flow__node-sticky-note {
-  z-index: 50 !important;
-}
-
-/* Legacy table nodes (if any remain) */
-.react-flow__node-table {
-  z-index: 100 !important;
-}
-
-/* Selected nodes get elevated above their peers */
-.react-flow__node.selected {
-  z-index: 999 !important;
-}
 
 

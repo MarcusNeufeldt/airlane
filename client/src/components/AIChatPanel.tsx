@@ -251,6 +251,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
             id: element.id,
             type: 'pool-with-lanes' as any,
             position: optimalPos,
+            zIndex: -20, // Pools in background
             data: {
               id: element.id,
               nodeType: 'pool-with-lanes' as const,
@@ -264,11 +265,20 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
             },
           };
         }
-        
+
+        // Determine z-index based on node type
+        let zIndex = 100; // Default for process nodes
+        if (element.type === 'lane') {
+          zIndex = -10;
+        } else if (element.type === 'pool') {
+          zIndex = -20;
+        }
+
         return {
           id: element.id,
           type: element.type as any,
           position: optimalPos,
+          zIndex: zIndex,
           data: {
             id: element.id,
             nodeType: element.type,

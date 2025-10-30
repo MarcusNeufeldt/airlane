@@ -349,22 +349,22 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
         case 'event':
           const eventType = options.eventType || 'start';
           const defaultLabel = eventType === 'end' ? 'End' : eventType === 'intermediate' ? 'Intermediate' : 'Start';
-          const eventData: EventNodeData = { 
-            id, 
-            nodeType: 'event', 
-            eventType: eventType, 
+          const eventData: EventNodeData = {
+            id,
+            nodeType: 'event',
+            eventType: eventType,
             label: options.label || defaultLabel
           };
-          newNode = { id, type, position: snappedPosition, data: eventData };
+          newNode = { id, type, position: snappedPosition, data: eventData, zIndex: 100 };
           break;
         case 'gateway':
-          const gatewayData: GatewayNodeData = { 
-            id, 
-            nodeType: 'gateway', 
-            gatewayType: options.gatewayType || 'exclusive', 
-            label: options.label || '' 
+          const gatewayData: GatewayNodeData = {
+            id,
+            nodeType: 'gateway',
+            gatewayType: options.gatewayType || 'exclusive',
+            label: options.label || ''
           };
-          newNode = { id, type, position: snappedPosition, data: gatewayData };
+          newNode = { id, type, position: snappedPosition, data: gatewayData, zIndex: 100 };
           break;
         case 'lane':
           const laneData: LaneNodeData = { 
@@ -411,17 +411,17 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
             dataType: dataType,
             label: options.label || defaultDataLabel
           };
-          newNode = { id, type, position: snappedPosition, data: dataObjectData };
+          newNode = { id, type, position: snappedPosition, data: dataObjectData, zIndex: 100 };
           break;
         case 'process':
         default:
-          const processData: ProcessNodeData = { 
-            id, 
-            nodeType: 'process', 
-            processType: 'task', 
-            label: options.label || 'New Task' 
+          const processData: ProcessNodeData = {
+            id,
+            nodeType: 'process',
+            processType: 'task',
+            label: options.label || 'New Task'
           };
-          newNode = { id, type, position: snappedPosition, data: processData };
+          newNode = { id, type, position: snappedPosition, data: processData, zIndex: 100 };
           break;
       }
       
@@ -661,61 +661,75 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
     },
 
     autoSizeLanes: (laneIds?: string[]) => {
-        const { nodes, edges } = get();
-        const PADDING = 20;
-
-        // Build parent-child map from edges with parent property
-        const parentMap = new Map<string, string[]>();
-        nodes.forEach(node => {
-            if (node.parentNode) {
-                if (!parentMap.has(node.parentNode)) {
-                    parentMap.set(node.parentNode, []);
-                }
-                parentMap.get(node.parentNode)!.push(node.id);
-            }
-        });
+        const { nodes } = get();
+        const PADDING = 30;
+        const LANE_HEADER_HEIGHT = 40;
 
         const newNodes = [...nodes];
-        const nodeMap = new Map(newNodes.map(n => [n.id, n]));
 
         // Determine which lanes to resize
         const lanesToResize = laneIds
-            ? newNodes.filter(n => n.type === 'lane' && laneIds.includes(n.id))
+            ? newNodes.filter(n => (n.type === 'lane' || n.type === 'pool' || n.type === 'pool-with-lanes') && laneIds.includes(n.id))
             : newNodes.filter(n => n.type === 'lane' || n.type === 'pool' || n.type === 'pool-with-lanes');
 
         let updated = false;
 
         lanesToResize.forEach(lane => {
-            const children = (parentMap.get(lane.id) || [])
-                .map(id => nodeMap.get(id))
-                .filter((n): n is Node => n !== undefined && n.type !== 'lane' && n.type !== 'pool'); // Exclude nested lanes/pools
+            const laneX = lane.position.x;
+            const laneY = lane.position.y;
+            const laneWidth = lane.data?.width || 600;
+            const laneHeight = lane.data?.height || 300;
 
-            if (children.length > 0) {
-                // Calculate bounding box of all children
-                const minX = Math.min(...children.map(n => n.position.x));
-                const minY = Math.min(...children.map(n => n.position.y));
-                const maxX = Math.max(...children.map(n => n.position.x + (n.data?.width || n.width || 150)));
-                const maxY = Math.max(...children.map(n => n.position.y + (n.data?.height || n.height || 80)));
+            // Find all nodes that are spatially inside this lane
+            const nodesInLane = newNodes.filter(n => {
+                // Skip the lane itself and other lanes/pools
+                if (n.id === lane.id) return false;
+                if (n.type === 'lane' || n.type === 'pool' || n.type === 'pool-with-lanes') return false;
+
+                // Check if node center is inside the lane bounds
+                const nodeCenterX = n.position.x + ((n.data?.width || n.width || 150) / 2);
+                const nodeCenterY = n.position.y + ((n.data?.height || n.height || 80) / 2);
+
+                return (
+                    nodeCenterX >= laneX &&
+                    nodeCenterX <= (laneX + laneWidth) &&
+                    nodeCenterY >= laneY &&
+                    nodeCenterY <= (laneY + laneHeight)
+                );
+            });
+
+            if (nodesInLane.length > 0) {
+                // Calculate bounding box of all nodes inside lane
+                const nodeRightEdges = nodesInLane.map(n => n.position.x + (n.data?.width || n.width || 150));
+                const nodeBottomEdges = nodesInLane.map(n => n.position.y + (n.data?.height || n.height || 80));
+
+                const minX = Math.min(...nodesInLane.map(n => n.position.x));
+                const minY = Math.min(...nodesInLane.map(n => n.position.y));
+                const maxX = Math.max(...nodeRightEdges);
+                const maxY = Math.max(...nodeBottomEdges);
 
                 // Calculate new lane dimensions with padding
                 const newWidth = (maxX - minX) + (PADDING * 2);
-                const newHeight = (maxY - minY) + (PADDING * 2) + 40; // Extra space for lane header
+                const newHeight = (maxY - minY) + (PADDING * 2) + LANE_HEADER_HEIGHT;
 
                 // Update lane position and size
-                lane.position = { x: minX - PADDING, y: minY - PADDING - 30 }; // Account for header
+                lane.position = {
+                    x: minX - PADDING,
+                    y: minY - PADDING - (LANE_HEADER_HEIGHT / 2)
+                };
                 lane.data = {
                     ...lane.data,
-                    width: newWidth,
-                    height: newHeight,
+                    width: Math.max(newWidth, 400), // Minimum width
+                    height: Math.max(newHeight, 200), // Minimum height
                 };
 
                 updated = true;
-            } else if (!lane.data?.width || lane.data.width < 300) {
+            } else if (!lane.data?.width || lane.data.width < 400) {
                 // Set default size for empty lanes
                 lane.data = {
                     ...lane.data,
-                    width: 400,
-                    height: 200,
+                    width: 600,
+                    height: 250,
                 };
                 updated = true;
             }
