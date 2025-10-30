@@ -117,7 +117,8 @@ interface DiagramState extends UIState {
   setContextMenuNode: (nodeId: string | null) => void;
   importDiagram: (diagramData: { nodes: Node[]; edges?: Edge[] }) => void;
   autoLayout: () => void;
-  
+  autoSizeLanes: (laneIds?: string[]) => void;
+
   // All other UI/notification/locking functions
   flashTable: (tableId: string) => void;
   addStickyNote: (position: { x: number; y: number }, content?: string) => void;
@@ -657,6 +658,72 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
         newNodes.forEach(node => {
             setTimeout(() => get().flashTable(node.id), Math.random() * 300);
         });
+    },
+
+    autoSizeLanes: (laneIds?: string[]) => {
+        const { nodes, edges } = get();
+        const PADDING = 20;
+
+        // Build parent-child map from edges with parent property
+        const parentMap = new Map<string, string[]>();
+        nodes.forEach(node => {
+            if (node.parentNode) {
+                if (!parentMap.has(node.parentNode)) {
+                    parentMap.set(node.parentNode, []);
+                }
+                parentMap.get(node.parentNode)!.push(node.id);
+            }
+        });
+
+        const newNodes = [...nodes];
+        const nodeMap = new Map(newNodes.map(n => [n.id, n]));
+
+        // Determine which lanes to resize
+        const lanesToResize = laneIds
+            ? newNodes.filter(n => n.type === 'lane' && laneIds.includes(n.id))
+            : newNodes.filter(n => n.type === 'lane' || n.type === 'pool' || n.type === 'pool-with-lanes');
+
+        let updated = false;
+
+        lanesToResize.forEach(lane => {
+            const children = (parentMap.get(lane.id) || [])
+                .map(id => nodeMap.get(id))
+                .filter((n): n is Node => n !== undefined && n.type !== 'lane' && n.type !== 'pool'); // Exclude nested lanes/pools
+
+            if (children.length > 0) {
+                // Calculate bounding box of all children
+                const minX = Math.min(...children.map(n => n.position.x));
+                const minY = Math.min(...children.map(n => n.position.y));
+                const maxX = Math.max(...children.map(n => n.position.x + (n.data?.width || n.width || 150)));
+                const maxY = Math.max(...children.map(n => n.position.y + (n.data?.height || n.height || 80)));
+
+                // Calculate new lane dimensions with padding
+                const newWidth = (maxX - minX) + (PADDING * 2);
+                const newHeight = (maxY - minY) + (PADDING * 2) + 40; // Extra space for lane header
+
+                // Update lane position and size
+                lane.position = { x: minX - PADDING, y: minY - PADDING - 30 }; // Account for header
+                lane.data = {
+                    ...lane.data,
+                    width: newWidth,
+                    height: newHeight,
+                };
+
+                updated = true;
+            } else if (!lane.data?.width || lane.data.width < 300) {
+                // Set default size for empty lanes
+                lane.data = {
+                    ...lane.data,
+                    width: 400,
+                    height: 200,
+                };
+                updated = true;
+            }
+        });
+
+        if (updated) {
+            setStateWithHistory({ nodes: newNodes }, 'Auto-size Lanes');
+        }
     },
 
     flashTable: (nodeId) => {

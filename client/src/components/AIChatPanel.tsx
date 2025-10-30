@@ -26,6 +26,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
     currentDiagramId,
     addStickyNote,
     autoLayout,
+    autoSizeLanes,
     projectContext
   } = useDiagramStore();
 
@@ -293,7 +294,16 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
       
       console.log('🔄 Applying full process replacement to canvas:', { nodes: newNodes.length, edges: newEdges.length });
       importDiagram({ nodes: newNodes, edges: newEdges });
-      
+
+      // Auto-size any lanes that were created by AI
+      const laneNodes = newNodes.filter(n => n.type === 'lane' || n.type === 'pool' || n.type === 'pool-with-lanes');
+      if (laneNodes.length > 0) {
+        console.log('📐 Auto-sizing', laneNodes.length, 'lanes/pools to fit their content');
+        setTimeout(() => {
+          autoSizeLanes();
+        }, 100);
+      }
+
       // Optional: Apply additional auto-layout refinement for complex processes
       if (newNodes.length > 5) {
         console.log('🎯 Applying additional auto-layout refinement for complex process');
@@ -322,6 +332,18 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
     
     console.log('✅ Final state computed:', { nodes: finalState.nodes.length, edges: finalState.edges.length, affected: finalState.affectedElementIds.length });
     importDiagram({ nodes: finalState.nodes, edges: finalState.edges });
+
+    // Auto-size lanes if they were affected by the modification
+    const affectedLanes = finalState.nodes.filter(n =>
+      (n.type === 'lane' || n.type === 'pool' || n.type === 'pool-with-lanes') &&
+      finalState.affectedElementIds.includes(n.id)
+    );
+    if (affectedLanes.length > 0) {
+      setTimeout(() => {
+        autoSizeLanes(affectedLanes.map(l => l.id));
+      }, 100);
+    }
+
     finalState.affectedElementIds.forEach(id => {
       flashTable(id);
     });
