@@ -236,6 +236,21 @@ Respond ONLY with valid JSON matching the required BPMN process format. Do not i
 
       let content = message.content;
 
+      // Handle Claude Sonnet 4.5 extended thinking format
+      // Content can be an array of blocks with type: "thinking" and type: "text"
+      if (Array.isArray(content)) {
+        console.log('🔍 [generateProcess] Content is an array (extended thinking format)');
+        // Extract only the "text" type blocks, ignore "thinking" blocks
+        const textBlocks = content.filter(block => block.type === 'text');
+        if (textBlocks.length > 0) {
+          content = textBlocks.map(block => block.text).join('\n');
+          console.log('🔍 [generateProcess] Extracted text from blocks:', content.substring(0, 500));
+        } else {
+          console.error('❌ [generateProcess] No text blocks found in content array!');
+          throw new Error('AI response has no text content blocks');
+        }
+      }
+
       if (!content) {
         console.error('❌ [generateProcess] No content in message!');
         throw new Error('AI response has no content');
@@ -463,6 +478,20 @@ ${currentProcess ? JSON.stringify(currentProcess, null, 2) : 'No process is on t
         const message = response.data.choices[0].message;
         console.log('🤖 AI Response message:', JSON.stringify(message, null, 2));
 
+        // Handle Claude Sonnet 4.5 extended thinking format for content
+        let messageContent = message.content;
+        if (Array.isArray(messageContent)) {
+          console.log('🔍 [chatAboutProcess] Content is an array (extended thinking format)');
+          // Extract only the "text" type blocks, ignore "thinking" blocks
+          const textBlocks = messageContent.filter(block => block.type === 'text');
+          if (textBlocks.length > 0) {
+            messageContent = textBlocks.map(block => block.text).join('\n');
+            console.log('🔍 [chatAboutProcess] Extracted text from blocks:', messageContent.substring(0, 200));
+          } else {
+            messageContent = null;
+          }
+        }
+
         // Check if AI wants to use a tool
         if (message.tool_calls && message.tool_calls.length > 0) {
           console.log('🔧 Tool calls detected:', message.tool_calls.length);
@@ -470,14 +499,14 @@ ${currentProcess ? JSON.stringify(currentProcess, null, 2) : 'No process is on t
           return {
             type: 'tool_call',
             tool_call: message.tool_calls[0],
-            message: message.content || "I'll help you with that using the appropriate tool."
+            message: messageContent || "I'll help you with that using the appropriate tool."
           };
         }
 
         console.log('💬 Direct message response');
         return {
           type: 'message',
-          content: message.content
+          content: messageContent
         };
       } catch (functionCallError) {
         console.log('Function calling failed, falling back to text analysis:', functionCallError.response?.data?.error?.message);
