@@ -66,6 +66,71 @@ A comprehensive context management system that makes AI suggestions project-awar
 - `0bf6ce0` - Add database migration for projectContext column
 - `1f00f53` - Add backward compatibility for projectContext column
 
+### 3. **Lane Tool Fixes** ✅ **CRITICAL FIX**
+Fixed fundamental issues with lane-based BPMN workflows!
+
+#### Problems Solved:
+**Problem 1: Connections Hidden Behind Lanes**
+- **Root Cause:** CSS z-index rules with `!important` were fighting ReactFlow's internal z-index system
+- **Solution:**
+  - Removed all CSS z-index hacks from `index.css`
+  - Set explicit `zIndex` property on all nodes:
+    - Pools: -20 (background)
+    - Lanes: -10 (background)
+    - Process elements: 100 (foreground)
+    - Edges: default (≈0, between lanes and process elements)
+  - Let ReactFlow's native layering work correctly
+- **Result:** Connections now properly visible above lanes! ✅
+
+**Problem 2: Vertical Layout Instead of Horizontal**
+- **Root Cause:** `calculateOptimalPositions()` was stacking elements in columns (3 per column)
+- **Solution:**
+  - Rewrote positioning algorithm to be lane-aware
+  - Detects if process has lanes
+  - **Lane mode:** Horizontal task flow within lanes, lanes stacked vertically
+  - **No-lane mode:** Simple horizontal left-to-right flow
+- **Result:** AI now generates horizontal flows! ✅
+
+**Problem 3: Nodes Not Positioned Inside Lanes**
+- **Root Cause:** Positioning algorithm ignored the `assignee` property that AI sets
+- **Solution:**
+  - Group tasks by their `assignee` property
+  - Match assignee to lane names
+  - Position tasks horizontally within their assigned lane
+  - Unassigned tasks positioned below all lanes
+- **Result:** Tasks now appear inside their correct lanes! ✅
+
+**Problem 4: Lane Auto-Sizing Not Working**
+- **Root Cause:** Algorithm relied on `parentNode` relationships that were never set
+- **Solution:**
+  - Rewrote `autoSizeLanes()` to use spatial overlap detection
+  - Check if node center point is within lane bounds
+  - Calculate bounding box and resize accordingly
+  - Integrated with positioning: auto-size runs after diagram import
+- **Result:** Lanes now auto-size to fit their content! ✅
+
+#### Technical Details:
+- **Z-Index Layering:**
+  - Uses ReactFlow's native `zIndex` node property
+  - Negative values = background, positive = foreground
+  - Edges default to 0, sitting between layers
+
+- **Lane-Aware Positioning:**
+  - Lanes: 250px vertical spacing
+  - Tasks: 220px horizontal spacing within lanes
+  - Lane header offset: 70px (tasks positioned below header)
+  - Start position: (50, 100)
+
+- **Spatial Overlap Detection:**
+  - Checks node center against lane bounds
+  - Padding: 30px around content
+  - Lane header height: 40px
+  - Min lane size: 400x200
+
+**Commits:**
+- `cfdf50e` - Fix lane z-index layering and AI lane auto-sizing
+- `0d2702c` - Implement lane-aware horizontal positioning for AI-generated processes
+
 ---
 
 ## 🎯 NEXT STEPS - User-Friendliness Quick Wins
