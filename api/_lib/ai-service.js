@@ -6,7 +6,7 @@ class AIService {
     // Sanitize API key to remove any hidden characters, newlines, or whitespace
     this.apiKey = process.env.OPENROUTER_API_KEY?.trim().replace(/[\r\n\t]/g, '');
     this.baseURL = process.env.OPENROUTER_BASE_URL?.trim();
-    this.defaultModel = process.env.DEFAULT_AI_MODEL?.trim() || 'anthropic/claude-3.5-sonnet';
+    this.defaultModel = process.env.DEFAULT_AI_MODEL?.trim() || 'anthropic/claude-sonnet-4.5';
     
     console.log('🔧 AIService constructor');
     console.log('🔑 API Key exists:', !!this.apiKey);
