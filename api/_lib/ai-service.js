@@ -224,8 +224,23 @@ Respond ONLY with valid JSON matching the required BPMN process format. Do not i
         })
       });
 
-      let content = response.data.choices[0].message.content;
-      
+      // Log the FULL raw response to debug Claude Sonnet 4.5 format
+      console.log('🔍 [generateProcess] RAW API RESPONSE:', JSON.stringify(response.data, null, 2));
+      console.log('🔍 [generateProcess] Response choices:', response.data.choices);
+      console.log('🔍 [generateProcess] First choice:', JSON.stringify(response.data.choices[0], null, 2));
+
+      const message = response.data.choices[0].message;
+      console.log('🔍 [generateProcess] Message object:', JSON.stringify(message, null, 2));
+      console.log('🔍 [generateProcess] Message.content type:', typeof message.content);
+      console.log('🔍 [generateProcess] Message.content:', message.content);
+
+      let content = message.content;
+
+      if (!content) {
+        console.error('❌ [generateProcess] No content in message!');
+        throw new Error('AI response has no content');
+      }
+
       // Handle case where AI returns JSON wrapped in markdown code blocks
       if (content.includes('```json')) {
         const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
@@ -239,8 +254,14 @@ Respond ONLY with valid JSON matching the required BPMN process format. Do not i
           content = codeMatch[1];
         }
       }
-      
-      return JSON.parse(content.trim());
+
+      console.log('🔍 [generateProcess] Content to parse:', content.substring(0, 500));
+      const parsedProcess = JSON.parse(content.trim());
+      console.log('🔍 [generateProcess] Parsed process:', JSON.stringify(parsedProcess, null, 2));
+      console.log('🔍 [generateProcess] Elements:', parsedProcess.elements);
+      console.log('🔍 [generateProcess] Flows:', parsedProcess.flows);
+
+      return parsedProcess;
     } catch (error) {
       console.error('AI Service Error:', error.response?.data || error.message);
       throw new Error(`Failed to generate process: ${error.response?.data?.error?.message || error.message}`);
@@ -433,6 +454,11 @@ ${currentProcess ? JSON.stringify(currentProcess, null, 2) : 'No process is on t
             'X-Title': 'Database Diagram Tool'
           }
         });
+
+        // Log the FULL raw response to debug Claude Sonnet 4.5 format
+        console.log('🔍 RAW API RESPONSE:', JSON.stringify(response.data, null, 2));
+        console.log('🔍 Response choices:', response.data.choices);
+        console.log('🔍 First choice:', JSON.stringify(response.data.choices[0], null, 2));
 
         const message = response.data.choices[0].message;
         console.log('🤖 AI Response message:', JSON.stringify(message, null, 2));
