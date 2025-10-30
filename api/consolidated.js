@@ -462,6 +462,34 @@ module.exports = async (req, res) => {
             return res.status(500).json({ error: 'Failed to summarize process', details: error.message });
         }
     }
+
+    // Route: POST /parse-project-context
+    if (method === 'POST' && url.includes('/parse-project-context')) {
+      try {
+        const { rawInput } = body;
+
+        if (!rawInput || typeof rawInput !== 'string' || !rawInput.trim()) {
+          return res.status(400).json({
+            error: 'rawInput (string) is required'
+          });
+        }
+
+        console.log('🔍 Parsing project context from raw input...');
+        console.log('📝 Input length:', rawInput.length);
+
+        const aiService = new AIService();
+        const parsedContext = await aiService.parseProjectContext(rawInput);
+        console.log('✅ Project context parsed successfully');
+
+        return res.json(parsedContext);
+      } catch (error) {
+        console.error('❌ Project context parsing failed:', error.message);
+        return res.status(500).json({
+          error: 'Failed to parse project context',
+          details: error.message
+        });
+      }
+    }
     
     // Legacy Route: POST /analyze-schema (for backward compatibility)
     if (method === 'POST' && url.includes('/analyze-schema')) {

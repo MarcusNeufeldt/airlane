@@ -11,6 +11,7 @@ import { WelcomeModal } from './WelcomeModal';
 import { AIChatPanel } from './AIChatPanel';
 import ReadOnlyBanner from './ReadOnlyBanner';
 import { SimulationPanel } from './SimulationPanel';
+import { ProjectContextModal } from './ProjectContextModal';
 import { useCollaborationStore } from '../stores/collaborationStore';
 import { useDiagramStore } from '../stores/diagramStore';
 // import { useDiagramLocking } from '../hooks/useDiagramLocking'; // Disabled until backend is ready
@@ -21,7 +22,7 @@ export const DiagramView: React.FC = () => {
   const { diagramId } = useParams<{ diagramId: string }>();
   const navigate = useNavigate();
   const { initializeCollaboration, doc } = useCollaborationStore();
-  const { initializeYjs, undo, redo, importDiagram, setCurrentDiagramId, isReadOnly, setReadOnly } = useDiagramStore();
+  const { initializeYjs, undo, redo, importDiagram, setCurrentDiagramId, isReadOnly, setReadOnly, projectContext, setProjectContext } = useDiagramStore();
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(userService.getCurrentUser());
   const [diagramInfo, setDiagramInfo] = useState<any>(null);
@@ -29,6 +30,7 @@ export const DiagramView: React.FC = () => {
   const [showMiniMap, setShowMiniMap] = useState(true);
   const [isSimulationOpen, setIsSimulationOpen] = useState(false);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+  const [showProjectContext, setShowProjectContext] = useState(false);
 
   // Initialize user if not logged in
   useEffect(() => {
@@ -243,6 +245,7 @@ export const DiagramView: React.FC = () => {
             onToggleMiniMap={() => setShowMiniMap(!showMiniMap)}
             onOpenSimulation={() => setIsSimulationOpen(true)}
             onShowKeyboardShortcuts={() => setShowKeyboardShortcuts(true)}
+            onShowProjectContext={() => setShowProjectContext(true)}
           />
         </div>
       </div>
@@ -273,6 +276,15 @@ export const DiagramView: React.FC = () => {
       <SimulationPanel
         isOpen={isSimulationOpen}
         onClose={() => setIsSimulationOpen(false)}
+      />
+      <ProjectContextModal
+        isOpen={showProjectContext}
+        onClose={() => setShowProjectContext(false)}
+        initialContext={projectContext}
+        onSave={(context) => {
+          setProjectContext(context);
+          // TODO: Save to backend with diagram
+        }}
       />
     </div>
   );

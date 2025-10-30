@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { ChevronDown, Settings, FileText, Layout, Grid3x3, Users, Maximize2, Save, Upload, Download, Eye, StickyNote, Square, Circle, Diamond, Keyboard } from 'lucide-react';
+import { ChevronDown, Settings, FileText, Layout, Grid3x3, Users, Maximize2, Save, Upload, Download, Eye, StickyNote, Square, Circle, Diamond, Keyboard, Briefcase } from 'lucide-react';
 import { useDiagramStore } from '../../stores/diagramStore';
 import { userService } from '../../services/userService';
 import { exportCurrentViewportAsPNG, exportFullDiagramAsPNG } from '../../lib/exportUtils';
@@ -11,6 +11,7 @@ interface ToolbarMenusProps {
   showMiniMap?: boolean;
   onToggleMiniMap?: () => void;
   onShowKeyboardShortcuts?: () => void;
+  onShowProjectContext?: () => void;
 }
 
 export const ToolbarMenus: React.FC<ToolbarMenusProps> = ({
@@ -18,7 +19,8 @@ export const ToolbarMenus: React.FC<ToolbarMenusProps> = ({
   onFileUpload,
   showMiniMap,
   onToggleMiniMap,
-  onShowKeyboardShortcuts
+  onShowKeyboardShortcuts,
+  onShowProjectContext
 }) => {
   const {
     nodes,
@@ -229,6 +231,16 @@ export const ToolbarMenus: React.FC<ToolbarMenusProps> = ({
                 >
                   <FileText size={16} className="text-gray-500" />
                   <span>BPMN Import/Export</span>
+                </button>
+                <button
+                  onClick={() => {
+                    onShowProjectContext?.();
+                    setShowMainMenu(false);
+                  }}
+                  className="w-full text-left px-2 py-2 text-sm hover:bg-gray-50 flex items-center space-x-3 rounded"
+                >
+                  <Briefcase size={16} className="text-purple-500" />
+                  <span>Project Context</span>
                 </button>
               </div>
             </div>

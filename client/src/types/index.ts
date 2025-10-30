@@ -119,3 +119,26 @@ export interface ShapeData {
   width: number;
   height: number;
 }
+
+// Project Context - AI-parsed structured information about the process
+export interface ProjectContext {
+  // Raw user input
+  rawInput: string;
+
+  // Parsed structured data
+  projectName: string;
+  industry?: string;
+  processType?: string;
+  businessObjective?: string;
+  stakeholders: string[];
+  businessRules: string[];
+  systemIntegrations: string[];
+  complianceRequirements: string[];
+  customTerminology: Record<string, string>;
+  additionalNotes?: string;
+
+  // Metadata
+  createdAt: string;
+  updatedAt: string;
+  lastParsedAt?: string;
+}

@@ -14,9 +14,10 @@ interface ToolbarProps {
   onToggleMiniMap?: () => void;
   onOpenSimulation?: () => void;
   onShowKeyboardShortcuts?: () => void;
+  onShowProjectContext?: () => void;
 }
 
-export const ToolbarClean: React.FC<ToolbarProps> = ({ onOpenAIChat, showMiniMap, onToggleMiniMap, onOpenSimulation, onShowKeyboardShortcuts }) => {
+export const ToolbarClean: React.FC<ToolbarProps> = ({ onOpenAIChat, showMiniMap, onToggleMiniMap, onOpenSimulation, onShowKeyboardShortcuts, onShowProjectContext }) => {
   const { importDiagram, addNotification } = useDiagramStore();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -77,6 +78,7 @@ export const ToolbarClean: React.FC<ToolbarProps> = ({ onOpenAIChat, showMiniMap
             showMiniMap={showMiniMap}
             onToggleMiniMap={onToggleMiniMap}
             onShowKeyboardShortcuts={onShowKeyboardShortcuts}
+            onShowProjectContext={onShowProjectContext}
           />
         </div>
 

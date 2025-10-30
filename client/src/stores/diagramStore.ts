@@ -21,6 +21,7 @@ import {
   PoolNodeData,
   PoolWithLanesData,
   DataObjectNodeData,
+  ProjectContext,
 } from '../types';
 import * as Y from 'yjs';
 
@@ -83,7 +84,8 @@ interface UIState {
   simulationSpeed: number;
   simulationPaused: boolean;
   simulationRandomness: boolean; // Whether to use random path selection for gateways
-
+  // Project context
+  projectContext: ProjectContext | null;
 }
 
 interface DiagramState extends UIState {
@@ -155,6 +157,9 @@ interface DiagramState extends UIState {
   previousSearchResult: () => void;
   alignSelectedNodes: (alignment: 'left' | 'right' | 'top' | 'bottom' | 'center-horizontal' | 'center-vertical') => void;
   distributeSelectedNodes: (direction: 'horizontal' | 'vertical') => void;
+  // Project context functions
+  setProjectContext: (context: ProjectContext | null) => void;
+  getProjectContext: () => ProjectContext | null;
 }
 
 const snapToGridPosition = (position: { x: number; y: number }, gridSize: number, snapEnabled: boolean) => {
@@ -269,6 +274,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
     simulationSpeed: 1000,
     simulationPaused: false,
     simulationRandomness: true, // Enable random path selection by default
+    // Project context
+    projectContext: null,
 
     // History Management
     undo: () => {
@@ -1377,6 +1384,15 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
       }
 
       setStateWithHistory({ nodes: distributedNodes }, `Distribute ${direction}`);
+    },
+
+    // Project context functions
+    setProjectContext: (context) => {
+      set({ projectContext: context });
+    },
+
+    getProjectContext: () => {
+      return get().projectContext;
     },
   };
 });

@@ -1168,6 +1168,99 @@ Respond with plain text analysis, not as a tool call.`;
       throw new Error(`Schema analysis failed: ${error.response?.data?.error?.message || error.message}`);
     }
   }
+
+  // Parse project context from raw user input
+  async parseProjectContext(rawInput) {
+    console.log('🔍 Parsing project context from raw input...');
+
+    const prompt = `You are an expert business process analyst. A user has provided context about their BPMN process project. Please extract and structure the following information from their input:
+
+USER INPUT:
+${rawInput}
+
+TASK:
+Parse the above text and extract structured information. Return a JSON object with these fields:
+
+{
+  "projectName": "The name or title of the process (required)",
+  "industry": "The industry or domain (e.g., Insurance, Healthcare, Finance)",
+  "processType": "The type of process (e.g., Approval, Fulfillment, Onboarding, Claims Processing)",
+  "businessObjective": "The main goal or objective of this process",
+  "stakeholders": ["List", "of", "stakeholder", "roles", "or", "people"],
+  "businessRules": ["List", "of", "business", "rules", "or", "constraints"],
+  "systemIntegrations": ["External", "systems", "mentioned"],
+  "complianceRequirements": ["Regulatory", "or", "compliance", "requirements"],
+  "customTerminology": {
+    "acronym1": "definition1",
+    "acronym2": "definition2"
+  },
+  "additionalNotes": "Any other important context not captured above"
+}
+
+INSTRUCTIONS:
+- Extract as much information as possible from the input
+- If a field is not mentioned, use an empty array [] or omit optional fields
+- For projectName, infer from context if not explicitly stated
+- For customTerminology, extract any acronyms or domain-specific terms with their definitions
+- Be comprehensive but accurate - don't invent information
+- businessRules should capture SLAs, approval thresholds, escalation rules, etc.
+
+Respond ONLY with the JSON object, no additional text.`;
+
+    try {
+      const response = await axios.post(`${this.baseURL}/chat/completions`, {
+        model: this.defaultModel,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a business process analyst expert who extracts structured information from text. Always respond with valid JSON only.'
+          },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.3, // Lower temperature for more consistent extraction
+        max_tokens: 2000
+      }, {
+        headers: this.getSafeHeaders({
+          'HTTP-Referer': 'https://airlane-bpmn.local',
+          'X-Title': 'Project Context Parsing'
+        })
+      });
+
+      const aiResponse = response.data.choices[0].message.content;
+      console.log('🤖 AI context parsing raw response:', aiResponse);
+
+      // Parse JSON response (handle potential markdown wrapping)
+      let parsedContext;
+      try {
+        const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+        const jsonString = jsonMatch ? jsonMatch[0] : aiResponse;
+        parsedContext = JSON.parse(jsonString);
+      } catch (parseError) {
+        console.error('❌ Failed to parse AI context response:', parseError);
+        throw new Error('Invalid AI response format');
+      }
+
+      // Validate and provide defaults
+      const validatedContext = {
+        projectName: parsedContext.projectName || 'Unnamed Process',
+        industry: parsedContext.industry || '',
+        processType: parsedContext.processType || '',
+        businessObjective: parsedContext.businessObjective || '',
+        stakeholders: Array.isArray(parsedContext.stakeholders) ? parsedContext.stakeholders : [],
+        businessRules: Array.isArray(parsedContext.businessRules) ? parsedContext.businessRules : [],
+        systemIntegrations: Array.isArray(parsedContext.systemIntegrations) ? parsedContext.systemIntegrations : [],
+        complianceRequirements: Array.isArray(parsedContext.complianceRequirements) ? parsedContext.complianceRequirements : [],
+        customTerminology: parsedContext.customTerminology || {},
+        additionalNotes: parsedContext.additionalNotes || ''
+      };
+
+      console.log('✅ Validated context:', validatedContext);
+      return validatedContext;
+    } catch (error) {
+      console.error('❌ Project context parsing error:', error.response?.data || error.message);
+      throw new Error(`Failed to parse project context: ${error.response?.data?.error?.message || error.message}`);
+    }
+  }
 }
 
 module.exports = AIService;
