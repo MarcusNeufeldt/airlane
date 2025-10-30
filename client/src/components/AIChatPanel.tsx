@@ -142,10 +142,20 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
 
   // Calculate optimal positions for elements based on process flow
   const calculateElementOrder = (elements: ProcessElement[], flows: ProcessFlow[]): string[] => {
+    // Safety checks
+    if (!elements || !Array.isArray(elements)) {
+      console.error('❌ calculateElementOrder: elements is not an array', elements);
+      return [];
+    }
+    if (!flows || !Array.isArray(flows)) {
+      console.error('❌ calculateElementOrder: flows is not an array', flows);
+      flows = [];
+    }
+
     // Build adjacency list for process flow
     const graph = new Map<string, string[]>();
     elements.forEach(e => graph.set(e.id, []));
-    
+
     flows.forEach(flow => {
       const connections = graph.get(flow.source) || [];
       connections.push(flow.target);
@@ -189,6 +199,16 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
 
   const calculateOptimalPositions = (elements: ProcessElement[], order: string[]): Map<string, {x: number, y: number}> => {
     const positions = new Map();
+
+    // Safety checks
+    if (!elements || !Array.isArray(elements)) {
+      console.error('❌ calculateOptimalPositions: elements is not an array', elements);
+      return positions;
+    }
+    if (!order || !Array.isArray(order)) {
+      console.error('❌ calculateOptimalPositions: order is not an array', order);
+      order = [];
+    }
 
     // Check if we have lanes in the process
     const lanes = elements.filter(e => e.type === 'lane' || e.type === 'pool-with-lanes');
@@ -332,17 +352,31 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
   const applyProcessChanges = (processModel: ProcessModel, isModification: boolean = false) => {
     console.log('🔄 applyProcessChanges called:', { isModification, nodeCount: nodes.length, processModel });
 
+    // Safety checks
+    if (!processModel) {
+      console.error('❌ applyProcessChanges: processModel is undefined');
+      return;
+    }
+    if (!processModel.elements || !Array.isArray(processModel.elements)) {
+      console.error('❌ applyProcessChanges: processModel.elements is not an array', processModel.elements);
+      processModel.elements = [];
+    }
+    if (!processModel.flows || !Array.isArray(processModel.flows)) {
+      console.error('❌ applyProcessChanges: processModel.flows is not an array', processModel.flows);
+      processModel.flows = [];
+    }
+
     if (!isModification || nodes.length === 0) {
       // Full replacement mode with smart positioning
       console.log('🧠 Calculating optimal positions for process elements...');
-      
+
       // Calculate optimal positions using flow-based algorithm
       const elementOrder = calculateElementOrder(processModel.elements, processModel.flows);
       const optimalPositions = calculateOptimalPositions(processModel.elements, elementOrder);
-      
+
       console.log('📍 Element order:', elementOrder);
       console.log('📍 Optimal positions calculated for', optimalPositions.size, 'elements');
-      
+
       const newNodes = processModel.elements.map((element) => {
         const optimalPos = optimalPositions.get(element.id) || element.position;
         
