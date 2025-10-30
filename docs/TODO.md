@@ -85,6 +85,14 @@ This document outlines the remaining tasks and improvements needed for the Proce
   - [x] **AI Smart Node System** ✅ **COMPLETED** - AI-powered next node prediction with Accept/Decline/Retry interface
   - [x] **Smart Node Renaming** ✅ **COMPLETED** - Context-aware AI naming suggestions with complete BPMN XML analysis
   - [x] **Raw BPMN XML Context** ✅ **COMPLETED** - Industry-standard XML schema sent to AI for precise business context understanding
+  - [x] **Project Context System** ✅ **COMPLETED (Oct 2025)** - Comprehensive project context management with AI integration
+    - [x] ProjectContextModal UI with text dump and AI parsing
+    - [x] Structured context fields (industry, stakeholders, business rules, terminology, etc.)
+    - [x] Backend API endpoint for AI-powered context parsing
+    - [x] Database persistence with diagram association
+    - [x] Full integration with AI Chat, Smart Node, and Smart Naming features
+    - [x] Backward-compatible database migration system
+  - [x] **Keyboard Shortcuts Help** ✅ **COMPLETED (Oct 2025)** - Integrated keyboard shortcuts panel with Ctrl+? shortcut
   - [ ] Implement element libraries/templates
   - [x] Add process validation (check for unconnected elements, missing start/end events)
   - [ ] Create process simulation/walkthrough mode
