@@ -189,41 +189,103 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
 
   const calculateOptimalPositions = (elements: ProcessElement[], order: string[]): Map<string, {x: number, y: number}> => {
     const positions = new Map();
-    const COLUMN_WIDTH = 200;
-    const ROW_HEIGHT = 150;
-    const START_X = 100;
-    const START_Y = 100;
-    
-    // Group elements by columns (process stages)
-    const columns: string[][] = [];
-    let currentColumn: string[] = [];
-    
-    order.forEach((elementId) => {
-      currentColumn.push(elementId);
-      
-      // New column every 3 elements or at gateways
-      const element = elements.find(e => e.id === elementId);
-      if (currentColumn.length >= 3 || element?.type === 'gateway') {
-        columns.push([...currentColumn]);
-        currentColumn = [];
-      }
-    });
-    
-    // Add remaining elements to final column
-    if (currentColumn.length > 0) {
-      columns.push(currentColumn);
-    }
-    
-    // Position elements in columns with proper spacing
-    columns.forEach((column, colIndex) => {
-      column.forEach((elementId, rowIndex) => {
-        positions.set(elementId, {
-          x: START_X + (colIndex * COLUMN_WIDTH),
-          y: START_Y + (rowIndex * ROW_HEIGHT)
+
+    // Check if we have lanes in the process
+    const lanes = elements.filter(e => e.type === 'lane' || e.type === 'pool-with-lanes');
+    const hasLanes = lanes.length > 0;
+
+    if (hasLanes) {
+      // LANE-AWARE POSITIONING (Horizontal flow within lanes, lanes stacked vertically)
+      const TASK_SPACING_X = 220;
+      const LANE_HEIGHT = 250;
+      const LANE_START_X = 50;
+      const TASK_START_X = 150;
+      const START_Y = 100;
+
+      // Group tasks by their assigned lane (via assignee property)
+      const tasksByLane = new Map<string, ProcessElement[]>();
+      const unassignedTasks: ProcessElement[] = [];
+
+      elements.forEach(element => {
+        if (element.type === 'lane' || element.type === 'pool' || element.type === 'pool-with-lanes') {
+          return; // Skip container elements
+        }
+
+        const assignee = element.properties?.assignee || element.properties?.performer;
+        if (assignee) {
+          if (!tasksByLane.has(assignee)) {
+            tasksByLane.set(assignee, []);
+          }
+          tasksByLane.get(assignee)!.push(element);
+        } else {
+          unassignedTasks.push(element);
+        }
+      });
+
+      console.log('🏊 Lane-aware positioning:', {
+        lanes: lanes.length,
+        tasksByLane: Array.from(tasksByLane.entries()).map(([lane, tasks]) => ({
+          lane,
+          taskCount: tasks.length
+        })),
+        unassigned: unassignedTasks.length
+      });
+
+      // Position lanes vertically
+      lanes.forEach((lane, laneIndex) => {
+        const laneY = START_Y + (laneIndex * LANE_HEIGHT);
+        const laneName = lane.label || lane.properties?.participant || `Lane ${laneIndex + 1}`;
+
+        // Position the lane itself
+        positions.set(lane.id, {
+          x: LANE_START_X,
+          y: laneY
+        });
+
+        // Position tasks within this lane horizontally
+        const tasksInLane = tasksByLane.get(laneName) || [];
+        tasksInLane.forEach((task, taskIndex) => {
+          positions.set(task.id, {
+            x: TASK_START_X + (taskIndex * TASK_SPACING_X),
+            y: laneY + 70 // Offset for lane header
+          });
         });
       });
-    });
-    
+
+      // Position any unassigned tasks below all lanes
+      if (unassignedTasks.length > 0) {
+        const fallbackY = START_Y + (lanes.length * LANE_HEIGHT);
+        unassignedTasks.forEach((task, index) => {
+          positions.set(task.id, {
+            x: TASK_START_X + (index * TASK_SPACING_X),
+            y: fallbackY
+          });
+        });
+      }
+
+    } else {
+      // FLOW-BASED HORIZONTAL POSITIONING (No lanes)
+      const COLUMN_WIDTH = 220;
+      const START_X = 100;
+      const START_Y = 100;
+
+      // Simple horizontal flow layout
+      const elementMap = new Map(elements.map(e => [e.id, e]));
+      let currentX = START_X;
+
+      order.forEach((elementId, index) => {
+        const element = elementMap.get(elementId);
+        if (!element) return;
+
+        positions.set(elementId, {
+          x: currentX,
+          y: START_Y
+        });
+
+        currentX += COLUMN_WIDTH;
+      });
+    }
+
     return positions;
   };
 
