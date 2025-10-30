@@ -31,14 +31,15 @@ class AINamingService {
     currentProcess: ProcessModel,
     additionalContext?: string,
     nodes?: any[],
-    edges?: any[]
+    edges?: any[],
+    projectContext?: any
   ): Promise<AINameSuggestion> {
     console.log('🏷️ suggestNodeNames called for node:', nodeId);
-    
+
     try {
       // Build context about the node and its surroundings
       const context = this.buildNamingContext(nodeId, currentProcess);
-      
+
       // Generate BPMN XML if nodes and edges are provided
       let bpmnXml = '';
       if (nodes && edges) {
@@ -49,18 +50,19 @@ class AINamingService {
           console.warn('🏷️ Failed to generate BPMN XML:', error);
         }
       }
-      
+
       console.log('🏷️ Sending context to backend:', context);
-      
+
       const response = await fetch(`${API_BASE_URL}/suggest-node-names`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           context,
           bpmnXml,
-          additionalContext: additionalContext || 'Suggest clear, professional BPMN node names'
+          additionalContext: additionalContext || 'Suggest clear, professional BPMN node names',
+          projectContext: projectContext
         }),
       });
 

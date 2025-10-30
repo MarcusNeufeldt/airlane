@@ -14,6 +14,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({ fileInputRef, onFileUpload }
   const {
     nodes,
     edges,
+    projectContext,
     importDiagram,
     isReadOnly,
     currentDiagramId,
@@ -69,6 +70,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({ fileInputRef, onFileUpload }
           name: 'Process Diagram',
           nodes,
           edges,
+          projectContext,
         }),
       });
 

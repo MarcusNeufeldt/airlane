@@ -9,12 +9,13 @@ CREATE TABLE IF NOT EXISTS User (
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Diagram table  
+-- Diagram table
 CREATE TABLE IF NOT EXISTS Diagram (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     nodes TEXT NOT NULL, -- JSON stored as text
     edges TEXT NOT NULL, -- JSON stored as text
+    projectContext TEXT, -- JSON stored as text
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     lockedByUserId TEXT,

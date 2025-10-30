@@ -49,7 +49,7 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
   onClose
 }) => {
   const selectorRef = useRef<HTMLDivElement>(null);
-  const { nodes, edges, updateNode } = useDiagramStore();
+  const { nodes, edges, updateNode, projectContext } = useDiagramStore();
   
   // Existing state
   const [selectedDirection, setSelectedDirection] = useState<'right' | 'down' | 'left' | 'up'>('right');
@@ -108,7 +108,7 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
     try {
       const currentProcess = getCurrentProcess();
       const contextWithDirection = `User wants to place the next node ${selectedDirection} of the current node. Suggest the most logical next BPMN element for this direction.`;
-      const suggestions = await aiService.suggestNextNode(sourceNodeId, currentProcess, contextWithDirection, selectedDirection, nodes, edges);
+      const suggestions = await aiService.suggestNextNode(sourceNodeId, currentProcess, contextWithDirection, selectedDirection, nodes, edges, projectContext);
       
       setAiSuggestions(suggestions);
       setIsAIMode(true);
@@ -147,7 +147,8 @@ export const QuickNodeSelector: React.FC<QuickNodeSelectorProps> = ({
         currentProcess,
         'Suggest clear, professional BPMN node names that reflect the business context',
         nodes,
-        edges
+        edges,
+        projectContext
       );
       setNameSuggestions(suggestions);
       setIsRenameMode(true);

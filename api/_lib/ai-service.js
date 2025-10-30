@@ -316,7 +316,7 @@ Respond ONLY with valid JSON matching the required BPMN process format. Do not i
   }
 
   // Chat with AI about the process (with function calling)
-  async chatAboutProcess(userMessage, currentProcess = null, conversationHistory = [], images = [], bpmnXml = null) {
+  async chatAboutProcess(userMessage, currentProcess = null, conversationHistory = [], images = [], bpmnXml = null, projectContext = null) {
     try {
       console.log('🔍 AI Service Debug - images parameter:', images);
       console.log('🔍 AI Service Debug - images type:', typeof images);
@@ -328,13 +328,36 @@ Respond ONLY with valid JSON matching the required BPMN process format. Do not i
       );
       
       console.log('🔍 AI Service Debug - conversationMentionsImages:', conversationMentionsImages);
-      
+
+      // Build project context section if available
+      let projectContextSection = '';
+      if (projectContext && projectContext.projectName) {
+        projectContextSection = `
+
+**PROJECT CONTEXT:**
+The user has provided important context about this project. Use this information to make your suggestions more relevant and aligned with their needs:
+
+- **Project Name:** ${projectContext.projectName}
+${projectContext.industry ? `- **Industry:** ${projectContext.industry}` : ''}
+${projectContext.processType ? `- **Process Type:** ${projectContext.processType}` : ''}
+${projectContext.businessObjective ? `- **Business Objective:** ${projectContext.businessObjective}` : ''}
+${projectContext.stakeholders && projectContext.stakeholders.length > 0 ? `- **Stakeholders:** ${projectContext.stakeholders.join(', ')}` : ''}
+${projectContext.businessRules && projectContext.businessRules.length > 0 ? `- **Business Rules:** ${projectContext.businessRules.map(r => `\n  • ${r}`).join('')}` : ''}
+${projectContext.systemIntegrations && projectContext.systemIntegrations.length > 0 ? `- **System Integrations:** ${projectContext.systemIntegrations.join(', ')}` : ''}
+${projectContext.complianceRequirements && projectContext.complianceRequirements.length > 0 ? `- **Compliance Requirements:** ${projectContext.complianceRequirements.join(', ')}` : ''}
+${projectContext.customTerminology && Object.keys(projectContext.customTerminology).length > 0 ? `- **Custom Terminology:** ${Object.entries(projectContext.customTerminology).map(([term, def]) => `\n  • ${term}: ${def}`).join('')}` : ''}
+${projectContext.additionalNotes ? `- **Additional Notes:** ${projectContext.additionalNotes}` : ''}
+
+**IMPORTANT:** When suggesting process elements, naming tasks, or making recommendations, always consider this project context. Use industry-specific terminology, respect the business rules, and align with the stated objectives.
+`;
+      }
+
       const systemPrompt = `You are an expert AI assistant embedded within a **visual, web-based BPMN process modeling tool**. Your name is "Process Modeler AI".
 
 Your primary role is to help users design and modify business processes by interacting with a visual canvas.${(images && images.length > 0) || conversationMentionsImages ? ' You have vision capabilities and can analyze images. You may have already analyzed images in this conversation.' : ''}
 
 **IMPORTANT:** Only mention image analysis if you are actually processing images. If the user provides text instructions, respond as if you are processing text-based requirements, not analyzing any visual content.
-
+${projectContextSection}
 **Key Concepts of Your Environment:**
 - The user is looking at an interactive **canvas**.
 - The process elements (tasks, events, gateways) are represented as **nodes** on the canvas.
@@ -618,7 +641,7 @@ Format your response in clear markdown with proper headers and bullet points.`;
     };
   }
 
-  async suggestNextNode(sourceNodeId, currentProcess, context = 'Suggest the most logical next BPMN element', selectedDirection = 'right', bpmnXml = null) {
+  async suggestNextNode(sourceNodeId, currentProcess, context = 'Suggest the most logical next BPMN element', selectedDirection = 'right', bpmnXml = null, projectContext = null) {
     try {
       console.log('🤖 Starting AI node suggestion for:', sourceNodeId, 'direction:', selectedDirection);
       
@@ -631,14 +654,35 @@ Format your response in clear markdown with proper headers and bullet points.`;
       // Enhanced: Analyze directional context
       const directionAnalysis = this.analyzeDirectionalContext(sourceNodeId, selectedDirection, currentProcess);
 
-      const prompt = `You are an expert BPMN process designer with spatial and business context awareness. Given the current process, user's directional intent, and the full BPMN XML schema, suggest 2-3 of the most logical next BPMN elements.
+      // Build project context section if available
+      let projectContextSection = '';
+      if (projectContext && projectContext.projectName) {
+        projectContextSection = `
 
+**PROJECT CONTEXT:**
+The user has provided important context about this project. Use this information to make your suggestions more relevant:
+
+- **Project Name:** ${projectContext.projectName}
+${projectContext.industry ? `- **Industry:** ${projectContext.industry}` : ''}
+${projectContext.processType ? `- **Process Type:** ${projectContext.processType}` : ''}
+${projectContext.businessObjective ? `- **Business Objective:** ${projectContext.businessObjective}` : ''}
+${projectContext.stakeholders && projectContext.stakeholders.length > 0 ? `- **Stakeholders:** ${projectContext.stakeholders.join(', ')}` : ''}
+${projectContext.businessRules && projectContext.businessRules.length > 0 ? `- **Business Rules:** ${projectContext.businessRules.map(r => `\n  • ${r}`).join('')}` : ''}
+${projectContext.systemIntegrations && projectContext.systemIntegrations.length > 0 ? `- **System Integrations:** ${projectContext.systemIntegrations.join(', ')}` : ''}
+${projectContext.customTerminology && Object.keys(projectContext.customTerminology).length > 0 ? `- **Custom Terminology:** ${Object.entries(projectContext.customTerminology).map(([term, def]) => `\n  • ${term}: ${def}`).join('')}` : ''}
+
+**IMPORTANT:** When suggesting elements, use industry-specific terminology and align with the stated objectives.
+`;
+      }
+
+      const prompt = `You are an expert BPMN process designer with spatial and business context awareness. Given the current process, user's directional intent, and the full BPMN XML schema, suggest 2-3 of the most logical next BPMN elements.
+${projectContextSection}
 **COMPLETE BPMN XML SCHEMA:**
 ${bpmnXml || 'BPMN XML not available. Rely on the element list below.'}
 
 **ANALYSIS INSTRUCTIONS:**
 1. **Parse the BPMN XML** to understand the complete business process structure, including pools, lanes, and sequence logic.
-2. **Identify the business domain** (e.g., finance, logistics, healthcare) from the process context.
+2. **Identify the business domain** (e.g., finance, logistics, healthcare) from the process context${projectContext ? ' and the provided project context' : ''}.
 3. **Analyze the user's immediate intent** based on the source node and their chosen direction.
 
 **🧭 CRITICAL: USER'S DIRECTIONAL INTENT**
@@ -845,12 +889,33 @@ Respond with a single JSON object in this exact format. Do not include any other
   }
 
   // New method for node naming suggestions
-  async suggestNodeNames(context, additionalContext, bpmnXml) {
+  async suggestNodeNames(context, additionalContext, bpmnXml, projectContext = null) {
     console.log('🏷️ Generating naming suggestions for:', context.targetNodeId);
-    
+
+    // Build project context section if available
+    let projectContextSection = '';
+    if (projectContext && projectContext.projectName) {
+      projectContextSection = `
+
+**PROJECT CONTEXT:**
+The user has provided specific information about this project. Use this to guide your naming suggestions:
+
+- **Project Name:** ${projectContext.projectName}
+${projectContext.industry ? `- **Industry:** ${projectContext.industry}` : ''}
+${projectContext.processType ? `- **Process Type:** ${projectContext.processType}` : ''}
+${projectContext.businessObjective ? `- **Business Objective:** ${projectContext.businessObjective}` : ''}
+${projectContext.stakeholders && projectContext.stakeholders.length > 0 ? `- **Stakeholders:** ${projectContext.stakeholders.join(', ')}` : ''}
+${projectContext.businessRules && projectContext.businessRules.length > 0 ? `- **Business Rules:** ${projectContext.businessRules.map(r => `\n  • ${r}`).join('')}` : ''}
+${projectContext.systemIntegrations && projectContext.systemIntegrations.length > 0 ? `- **System Integrations:** ${projectContext.systemIntegrations.join(', ')}` : ''}
+${projectContext.customTerminology && Object.keys(projectContext.customTerminology).length > 0 ? `- **Custom Terminology:** ${Object.entries(projectContext.customTerminology).map(([term, def]) => `\n  • ${term}: ${def}`).join('')}` : ''}
+
+**IMPORTANT:** Use industry-specific terminology and align names with the project context and custom terminology provided.
+`;
+    }
+
     // Build a comprehensive prompt with raw BPMN XML schema
     const prompt = `You are a BPMN expert helping to suggest better names for process elements based on the complete BPMN process schema.
-
+${projectContextSection}
 **COMPLETE BPMN XML SCHEMA:**
 ${bpmnXml || 'BPMN XML not available'}
 

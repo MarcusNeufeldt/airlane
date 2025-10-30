@@ -151,7 +151,7 @@ class AIService {
   }
 
   // New method for posting messages to the stateful chat endpoint
-  async postChatMessage(diagramId: string, message: string, currentProcess?: ProcessModel, images?: string[], bpmnXml?: string): Promise<any> {
+  async postChatMessage(diagramId: string, message: string, currentProcess?: ProcessModel, images?: string[], bpmnXml?: string, projectContext?: any): Promise<any> {
     console.log(`💬 Posting message to diagram ${diagramId}:`, message.substring(0, 100));
     if (images && images.length > 0) {
       console.log(`🖼️ Including ${images.length} images in request`);
@@ -159,13 +159,19 @@ class AIService {
     if (bpmnXml) {
       console.log(`🔧 Including BPMN XML context for enhanced AI understanding`);
     }
-    
+    if (projectContext) {
+      console.log(`📋 Including project context for enhanced AI understanding`);
+    }
+
     const body: any = { message, currentProcess };
     if (images && images.length > 0) {
       body.images = images;
     }
     if (bpmnXml) {
       body.bpmnXml = bpmnXml;
+    }
+    if (projectContext) {
+      body.projectContext = projectContext;
     }
 
     const response = await fetch(`${API_BASE_URL}/diagram-chat?id=${diagramId}`, {
@@ -517,30 +523,32 @@ ${process.elements.map(e => `- ${e.type}: ${e.label}`).join('\n')}
   }
 
   async suggestNextNode(
-    sourceNodeId: string, 
+    sourceNodeId: string,
     currentProcess: ProcessModel,
     context: string,
     selectedDirection: 'right' | 'down' | 'left' | 'up',
     nodes: Node[],
-    edges: Edge[]
+    edges: Edge[],
+    projectContext?: any
   ): Promise<AINodeSuggestion[]> {
     console.log('🤖 suggestNextNode called for node:', sourceNodeId);
-    
+
     try {
       // Generate BPMN XML for complete context
       const bpmnXml = BPMNService.exportBPMN(nodes, edges, 'Current Process');
-      
+
       const response = await fetch(`${API_BASE_URL}/suggest-next-node`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          sourceNodeId, 
+        body: JSON.stringify({
+          sourceNodeId,
           currentProcess,
           context: context || 'Suggest the most logical next BPMN element',
           selectedDirection: selectedDirection || 'right',
           bpmnXml: bpmnXml,
+          projectContext: projectContext,
         }),
       });
 

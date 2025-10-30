@@ -393,19 +393,22 @@ module.exports = async (req, res) => {
     // Route: POST /suggest-next-node
     if (method === 'POST' && url.includes('/suggest-next-node')) {
       try {
-        const { sourceNodeId, currentProcess, context, selectedDirection, bpmnXml } = body;
-        
+        const { sourceNodeId, currentProcess, context, selectedDirection, bpmnXml, projectContext } = body;
+
         if (!sourceNodeId || !currentProcess) {
-          return res.status(400).json({ 
-            error: 'sourceNodeId and currentProcess are required' 
+          return res.status(400).json({
+            error: 'sourceNodeId and currentProcess are required'
           });
         }
 
         console.log('🤖 AI suggesting next node for:', sourceNodeId, 'direction:', selectedDirection);
+        if (projectContext) {
+          console.log('📋 Project context provided:', projectContext.projectName || 'Unnamed project');
+        }
         const aiService = new AIService();
-        const suggestions = await aiService.suggestNextNode(sourceNodeId, currentProcess, context, selectedDirection, bpmnXml);
+        const suggestions = await aiService.suggestNextNode(sourceNodeId, currentProcess, context, selectedDirection, bpmnXml, projectContext);
         console.log('✅ AI suggestions generated');
-        
+
         return res.json({ suggestions });
       } catch (error) {
         console.error('❌ AI node suggestion failed:', error.message);
@@ -419,11 +422,11 @@ module.exports = async (req, res) => {
     // Route: POST /suggest-node-names
     if (method === 'POST' && url.includes('/suggest-node-names')) {
       try {
-        const { context, additionalContext, bpmnXml } = body;
-        
+        const { context, additionalContext, bpmnXml, projectContext } = body;
+
         if (!context || !context.targetNodeId) {
-          return res.status(400).json({ 
-            error: 'context with targetNodeId is required' 
+          return res.status(400).json({
+            error: 'context with targetNodeId is required'
           });
         }
 
@@ -431,11 +434,14 @@ module.exports = async (req, res) => {
         if (bpmnXml) {
           console.log('🏷️ BPMN XML provided for context, length:', bpmnXml.length);
         }
-        
+        if (projectContext) {
+          console.log('📋 Project context provided:', projectContext.projectName || 'Unnamed project');
+        }
+
         const aiService = new AIService();
-        const suggestion = await aiService.suggestNodeNames(context, additionalContext, bpmnXml);
+        const suggestion = await aiService.suggestNodeNames(context, additionalContext, bpmnXml, projectContext);
         console.log('✅ AI naming suggestions generated');
-        
+
         return res.json({ suggestion });
       } catch (error) {
         console.error('❌ AI naming suggestion failed:', error.message);
@@ -694,7 +700,7 @@ module.exports = async (req, res) => {
       const client = createDbClient();
       
       try {
-        const { name, nodes, edges, ownerId, ownerName, ownerEmail } = body;
+        const { name, nodes, edges, projectContext, ownerId, ownerName, ownerEmail } = body;
         
         if (!name || !ownerId) {
           return res.status(400).json({ error: 'Name and ownerId are required' });
@@ -719,23 +725,24 @@ module.exports = async (req, res) => {
         const now = new Date().toISOString();
         
         await client.execute({
-          sql: `INSERT INTO Diagram (id, name, nodes, edges, ownerId, createdAt, updatedAt) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          sql: `INSERT INTO Diagram (id, name, nodes, edges, projectContext, ownerId, createdAt, updatedAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           args: [
-            diagramId, 
-            name, 
-            JSON.stringify(nodes || []), 
-            JSON.stringify(edges || []), 
-            ownerId, 
-            now, 
+            diagramId,
+            name,
+            JSON.stringify(nodes || []),
+            JSON.stringify(edges || []),
+            projectContext ? JSON.stringify(projectContext) : null,
+            ownerId,
+            now,
             now
           ]
         });
         
         // Get the created diagram with owner info
         const result = await client.execute({
-          sql: `SELECT 
-                  d.id, d.name, d.nodes, d.edges, d.createdAt, d.updatedAt,
+          sql: `SELECT
+                  d.id, d.name, d.nodes, d.edges, d.projectContext, d.createdAt, d.updatedAt,
                   d.lockedByUserId, d.lockExpiresAt, d.ownerId,
                   u.name as ownerName, u.email as ownerEmail
                 FROM Diagram d
@@ -743,13 +750,14 @@ module.exports = async (req, res) => {
                 WHERE d.id = ?`,
           args: [diagramId]
         });
-        
+
         const row = result.rows[0];
         const diagram = {
           id: row.id,
           name: row.name,
           nodes: JSON.parse(row.nodes),
           edges: JSON.parse(row.edges),
+          projectContext: row.projectContext ? JSON.parse(row.projectContext) : null,
           createdAt: row.createdAt,
           updatedAt: row.updatedAt,
           lockedByUserId: row.lockedByUserId,
@@ -810,8 +818,8 @@ module.exports = async (req, res) => {
         console.log('🔍 Querying database for diagram:', id);
         // Get diagram with owner info
         const result = await client.execute({
-          sql: `SELECT 
-                  d.id, d.name, d.nodes, d.edges, d.createdAt, d.updatedAt,
+          sql: `SELECT
+                  d.id, d.name, d.nodes, d.edges, d.projectContext, d.createdAt, d.updatedAt,
                   d.lockedByUserId, d.lockExpiresAt, d.ownerId,
                   u.name as ownerName, u.email as ownerEmail
                 FROM Diagram d
@@ -849,6 +857,7 @@ module.exports = async (req, res) => {
           name: row.name,
           nodes: JSON.parse(row.nodes),
           edges: JSON.parse(row.edges),
+          projectContext: row.projectContext ? JSON.parse(row.projectContext) : null,
           createdAt: row.createdAt,
           updatedAt: row.updatedAt,
           lockedByUserId: row.lockedByUserId,
@@ -886,7 +895,7 @@ module.exports = async (req, res) => {
     if (method === 'PUT' && url.includes('/diagram') && !url.includes('/diagrams') && !url.includes('/diagram-')) {
       const urlParams = new URLSearchParams(url.split('?')[1] || '');
       const id = urlParams.get('id');
-      const { userId, name, nodes, edges } = body;
+      const { userId, name, nodes, edges, projectContext } = body;
 
       if (!userId) {
         return res.status(400).json({ success: false, message: 'userId is required' });
@@ -915,13 +924,14 @@ module.exports = async (req, res) => {
 
           // Create the new diagram
           await client.execute({
-            sql: `INSERT INTO Diagram (id, name, nodes, edges, ownerId, createdAt, updatedAt, lockedByUserId, lockExpiresAt) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            sql: `INSERT INTO Diagram (id, name, nodes, edges, projectContext, ownerId, createdAt, updatedAt, lockedByUserId, lockExpiresAt)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             args: [
               id,
               name || 'Untitled Diagram',
               JSON.stringify(nodes || []),
               JSON.stringify(edges || []),
+              projectContext ? JSON.stringify(projectContext) : null,
               userId,
               now.toISOString(),
               now.toISOString(),
@@ -957,7 +967,7 @@ module.exports = async (req, res) => {
         // Update the diagram
         const params = [now.toISOString()];
         let sql = 'UPDATE Diagram SET updatedAt = ?';
-        
+
         if (name) {
           sql += ', name = ?';
           params.push(name);
@@ -970,7 +980,11 @@ module.exports = async (req, res) => {
           sql += ', edges = ?';
           params.push(JSON.stringify(edges));
         }
-        
+        if (projectContext !== undefined) {
+          sql += ', projectContext = ?';
+          params.push(projectContext ? JSON.stringify(projectContext) : null);
+        }
+
         sql += ' WHERE id = ?';
         params.push(id);
 
@@ -1166,11 +1180,11 @@ module.exports = async (req, res) => {
       }
     }
     
-    // Route: POST /diagram-chat?id=... - Send chat message  
+    // Route: POST /diagram-chat?id=... - Send chat message
     if (method === 'POST' && url.includes('/diagram-chat')) {
       const urlParams = new URLSearchParams(url.split('?')[1] || '');
       const diagramId = urlParams.get('id');
-      const { message, currentProcess, images, bpmnXml } = body;
+      const { message, currentProcess, images, bpmnXml, projectContext } = body;
         
         console.log('🔍 Debug - images parameter:', images);
         console.log('🔍 Debug - images type:', typeof images);
@@ -1222,12 +1236,15 @@ module.exports = async (req, res) => {
         // 3. Call the AI service with full context
         const aiService = new AIService();
         
-        // Always use process-focused method with BPMN XML context
+        // Always use process-focused method with BPMN XML context and project context
         let aiResponse;
         if (bpmnXml) {
           console.log('🔧 Including BPMN XML context for enhanced AI understanding, length:', bpmnXml.length);
         }
-        aiResponse = await aiService.chatAboutProcess(message, currentProcess || null, conversationHistory, images, bpmnXml);
+        if (projectContext) {
+          console.log('📋 Including project context for enhanced AI understanding:', projectContext.projectName || 'Unnamed project');
+        }
+        aiResponse = await aiService.chatAboutProcess(message, currentProcess || null, conversationHistory, images, bpmnXml, projectContext);
         
         console.log('🤖 AI response received');
         console.log('🔍 Response type:', aiResponse.type);

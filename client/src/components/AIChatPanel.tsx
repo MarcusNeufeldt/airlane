@@ -17,15 +17,16 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
   const [uploadedImages, setUploadedImages] = useState<Array<{file: File, preview: string}>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { 
-    nodes, 
-    edges, 
+  const {
+    nodes,
+    edges,
     importDiagram,
     flashTable,
     isReadOnly,
     currentDiagramId,
     addStickyNote,
-    autoLayout
+    autoLayout,
+    projectContext
   } = useDiagramStore();
 
   const scrollToBottom = () => {
@@ -473,8 +474,8 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
 
       const imageDataUrls = currentImages.length > 0 ? await Promise.all(currentImages.map(img => convertImageToBase64(img.file))) : undefined;
 
-      // This is the key change: use the stateful endpoint with BPMN XML context
-      const response = await aiService.postChatMessage(currentDiagramId, currentInput, currentProcess, imageDataUrls, bpmnXml);
+      // This is the key change: use the stateful endpoint with BPMN XML context and project context
+      const response = await aiService.postChatMessage(currentDiagramId, currentInput, currentProcess, imageDataUrls, bpmnXml, projectContext);
       
       console.log('📦 Response from stateful chat:', response);
 

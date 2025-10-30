@@ -22,7 +22,7 @@ export const DiagramView: React.FC = () => {
   const { diagramId } = useParams<{ diagramId: string }>();
   const navigate = useNavigate();
   const { initializeCollaboration, doc } = useCollaborationStore();
-  const { initializeYjs, undo, redo, importDiagram, setCurrentDiagramId, isReadOnly, setReadOnly, projectContext, setProjectContext } = useDiagramStore();
+  const { initializeYjs, undo, redo, importDiagram, setCurrentDiagramId, isReadOnly, setReadOnly, projectContext, setProjectContext, addNotification } = useDiagramStore();
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(userService.getCurrentUser());
   const [diagramInfo, setDiagramInfo] = useState<any>(null);
@@ -109,7 +109,7 @@ export const DiagramView: React.FC = () => {
 
         const diagram = await response.json();
         console.log('📊 Loaded diagram data:', diagram);
-        
+
         setDiagramInfo({
           id: diagram.id,
           name: diagram.name,
@@ -123,6 +123,12 @@ export const DiagramView: React.FC = () => {
           nodes: diagram.nodes || [],
           edges: diagram.edges || [],
         });
+
+        // Load project context if it exists
+        if (diagram.projectContext) {
+          console.log('📋 Loading project context:', diagram.projectContext);
+          setProjectContext(diagram.projectContext);
+        }
         
         console.log('✅ Diagram loaded successfully from cloud database');
       } catch (error) {
@@ -281,9 +287,42 @@ export const DiagramView: React.FC = () => {
         isOpen={showProjectContext}
         onClose={() => setShowProjectContext(false)}
         initialContext={projectContext}
-        onSave={(context) => {
+        onSave={async (context) => {
           setProjectContext(context);
-          // TODO: Save to backend with diagram
+
+          // Save to backend with diagram
+          if (!diagramId) {
+            addNotification('warning', 'No diagram ID available for saving');
+            return;
+          }
+
+          const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+          try {
+            addNotification('info', 'Saving project context...', 1000);
+
+            const response = await fetch(`${API_BASE_URL}/diagram?id=${diagramId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                userId: currentUser?.id,
+                projectContext: context,
+              }),
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+              addNotification('success', '✅ Project context saved successfully!');
+            } else {
+              console.error('Save failed:', result.message);
+              addNotification('error', 'Failed to save project context: ' + result.message);
+            }
+          } catch (error) {
+            console.error('Save error:', error);
+            addNotification('error', 'Failed to save project context. Please try again.');
+          }
         }}
       />
     </div>
