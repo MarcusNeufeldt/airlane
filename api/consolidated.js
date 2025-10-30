@@ -723,33 +723,71 @@ module.exports = async (req, res) => {
         
         const diagramId = 'diagram-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
         const now = new Date().toISOString();
-        
-        await client.execute({
-          sql: `INSERT INTO Diagram (id, name, nodes, edges, projectContext, ownerId, createdAt, updatedAt)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          args: [
-            diagramId,
-            name,
-            JSON.stringify(nodes || []),
-            JSON.stringify(edges || []),
-            projectContext ? JSON.stringify(projectContext) : null,
-            ownerId,
-            now,
-            now
-          ]
-        });
-        
+
+        // Try to insert with projectContext, fall back if column doesn't exist
+        let hasProjectContextColumn = true;
+        try {
+          await client.execute({
+            sql: `INSERT INTO Diagram (id, name, nodes, edges, projectContext, ownerId, createdAt, updatedAt)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [
+              diagramId,
+              name,
+              JSON.stringify(nodes || []),
+              JSON.stringify(edges || []),
+              projectContext ? JSON.stringify(projectContext) : null,
+              ownerId,
+              now,
+              now
+            ]
+          });
+        } catch (columnError) {
+          if (columnError.message && columnError.message.includes('no such column')) {
+            console.log('⚠️ projectContext column not found, inserting without it (migration pending)');
+            hasProjectContextColumn = false;
+            await client.execute({
+              sql: `INSERT INTO Diagram (id, name, nodes, edges, ownerId, createdAt, updatedAt)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              args: [
+                diagramId,
+                name,
+                JSON.stringify(nodes || []),
+                JSON.stringify(edges || []),
+                ownerId,
+                now,
+                now
+              ]
+            });
+          } else {
+            throw columnError;
+          }
+        }
+
         // Get the created diagram with owner info
-        const result = await client.execute({
-          sql: `SELECT
-                  d.id, d.name, d.nodes, d.edges, d.projectContext, d.createdAt, d.updatedAt,
-                  d.lockedByUserId, d.lockExpiresAt, d.ownerId,
-                  u.name as ownerName, u.email as ownerEmail
-                FROM Diagram d
-                JOIN User u ON d.ownerId = u.id
-                WHERE d.id = ?`,
-          args: [diagramId]
-        });
+        let result;
+        if (hasProjectContextColumn) {
+          result = await client.execute({
+            sql: `SELECT
+                    d.id, d.name, d.nodes, d.edges, d.projectContext, d.createdAt, d.updatedAt,
+                    d.lockedByUserId, d.lockExpiresAt, d.ownerId,
+                    u.name as ownerName, u.email as ownerEmail
+                  FROM Diagram d
+                  JOIN User u ON d.ownerId = u.id
+                  WHERE d.id = ?`,
+            args: [diagramId]
+          });
+        } else {
+          result = await client.execute({
+            sql: `SELECT
+                    d.id, d.name, d.nodes, d.edges, d.createdAt, d.updatedAt,
+                    d.lockedByUserId, d.lockExpiresAt, d.ownerId,
+                    u.name as ownerName, u.email as ownerEmail
+                  FROM Diagram d
+                  JOIN User u ON d.ownerId = u.id
+                  WHERE d.id = ?`,
+            args: [diagramId]
+          });
+        }
 
         const row = result.rows[0];
         const diagram = {
@@ -757,7 +795,7 @@ module.exports = async (req, res) => {
           name: row.name,
           nodes: JSON.parse(row.nodes),
           edges: JSON.parse(row.edges),
-          projectContext: row.projectContext ? JSON.parse(row.projectContext) : null,
+          projectContext: hasProjectContextColumn && row.projectContext ? JSON.parse(row.projectContext) : null,
           createdAt: row.createdAt,
           updatedAt: row.updatedAt,
           lockedByUserId: row.lockedByUserId,
@@ -816,18 +854,43 @@ module.exports = async (req, res) => {
 
       try {
         console.log('🔍 Querying database for diagram:', id);
-        // Get diagram with owner info
-        const result = await client.execute({
-          sql: `SELECT
-                  d.id, d.name, d.nodes, d.edges, d.projectContext, d.createdAt, d.updatedAt,
-                  d.lockedByUserId, d.lockExpiresAt, d.ownerId,
-                  u.name as ownerName, u.email as ownerEmail
-                FROM Diagram d
-                JOIN User u ON d.ownerId = u.id
-                WHERE d.id = ?`,
-          args: [id]
-        });
-        
+
+        // Try to get diagram with projectContext (backward compatible)
+        let result;
+        let hasProjectContextColumn = true;
+
+        try {
+          // Get diagram with owner info (including projectContext)
+          result = await client.execute({
+            sql: `SELECT
+                    d.id, d.name, d.nodes, d.edges, d.projectContext, d.createdAt, d.updatedAt,
+                    d.lockedByUserId, d.lockExpiresAt, d.ownerId,
+                    u.name as ownerName, u.email as ownerEmail
+                  FROM Diagram d
+                  JOIN User u ON d.ownerId = u.id
+                  WHERE d.id = ?`,
+            args: [id]
+          });
+        } catch (columnError) {
+          // If projectContext column doesn't exist yet, query without it
+          if (columnError.message && columnError.message.includes('no such column')) {
+            console.log('⚠️ projectContext column not found, querying without it (migration pending)');
+            hasProjectContextColumn = false;
+            result = await client.execute({
+              sql: `SELECT
+                      d.id, d.name, d.nodes, d.edges, d.createdAt, d.updatedAt,
+                      d.lockedByUserId, d.lockExpiresAt, d.ownerId,
+                      u.name as ownerName, u.email as ownerEmail
+                    FROM Diagram d
+                    JOIN User u ON d.ownerId = u.id
+                    WHERE d.id = ?`,
+              args: [id]
+            });
+          } else {
+            throw columnError;
+          }
+        }
+
         console.log('✅ Query executed, rows found:', result.rows.length);
 
         if (result.rows.length === 0) {
@@ -857,7 +920,7 @@ module.exports = async (req, res) => {
           name: row.name,
           nodes: JSON.parse(row.nodes),
           edges: JSON.parse(row.edges),
-          projectContext: row.projectContext ? JSON.parse(row.projectContext) : null,
+          projectContext: hasProjectContextColumn && row.projectContext ? JSON.parse(row.projectContext) : null,
           createdAt: row.createdAt,
           updatedAt: row.updatedAt,
           lockedByUserId: row.lockedByUserId,
@@ -922,23 +985,46 @@ module.exports = async (req, res) => {
             args: [userId, `${userId}@example.com`, userId]
           });
 
-          // Create the new diagram
-          await client.execute({
-            sql: `INSERT INTO Diagram (id, name, nodes, edges, projectContext, ownerId, createdAt, updatedAt, lockedByUserId, lockExpiresAt)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            args: [
-              id,
-              name || 'Untitled Diagram',
-              JSON.stringify(nodes || []),
-              JSON.stringify(edges || []),
-              projectContext ? JSON.stringify(projectContext) : null,
-              userId,
-              now.toISOString(),
-              now.toISOString(),
-              userId,
-              new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 minute lock
-            ]
-          });
+          // Create the new diagram (backward compatible)
+          try {
+            await client.execute({
+              sql: `INSERT INTO Diagram (id, name, nodes, edges, projectContext, ownerId, createdAt, updatedAt, lockedByUserId, lockExpiresAt)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              args: [
+                id,
+                name || 'Untitled Diagram',
+                JSON.stringify(nodes || []),
+                JSON.stringify(edges || []),
+                projectContext ? JSON.stringify(projectContext) : null,
+                userId,
+                now.toISOString(),
+                now.toISOString(),
+                userId,
+                new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 minute lock
+              ]
+            });
+          } catch (columnError) {
+            if (columnError.message && columnError.message.includes('no such column')) {
+              console.log('⚠️ projectContext column not found, creating without it (migration pending)');
+              await client.execute({
+                sql: `INSERT INTO Diagram (id, name, nodes, edges, ownerId, createdAt, updatedAt, lockedByUserId, lockExpiresAt)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                args: [
+                  id,
+                  name || 'Untitled Diagram',
+                  JSON.stringify(nodes || []),
+                  JSON.stringify(edges || []),
+                  userId,
+                  now.toISOString(),
+                  now.toISOString(),
+                  userId,
+                  new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 minute lock
+                ]
+              });
+            } else {
+              throw columnError;
+            }
+          }
 
           console.log(`✅ Diagram created successfully: ${id}`);
           return res.json({ success: true, created: true });
@@ -964,7 +1050,7 @@ module.exports = async (req, res) => {
           });
         }
 
-        // Update the diagram
+        // Update the diagram (backward compatible)
         const params = [now.toISOString()];
         let sql = 'UPDATE Diagram SET updatedAt = ?';
 
@@ -988,10 +1074,42 @@ module.exports = async (req, res) => {
         sql += ' WHERE id = ?';
         params.push(id);
 
-        await client.execute({
-          sql,
-          args: params
-        });
+        try {
+          await client.execute({
+            sql,
+            args: params
+          });
+        } catch (columnError) {
+          if (columnError.message && columnError.message.includes('no such column') && projectContext !== undefined) {
+            // Retry without projectContext if the column doesn't exist
+            console.log('⚠️ projectContext column not found, updating without it (migration pending)');
+            const paramsWithoutContext = [now.toISOString()];
+            let sqlWithoutContext = 'UPDATE Diagram SET updatedAt = ?';
+
+            if (name) {
+              sqlWithoutContext += ', name = ?';
+              paramsWithoutContext.push(name);
+            }
+            if (nodes) {
+              sqlWithoutContext += ', nodes = ?';
+              paramsWithoutContext.push(JSON.stringify(nodes));
+            }
+            if (edges) {
+              sqlWithoutContext += ', edges = ?';
+              paramsWithoutContext.push(JSON.stringify(edges));
+            }
+
+            sqlWithoutContext += ' WHERE id = ?';
+            paramsWithoutContext.push(id);
+
+            await client.execute({
+              sql: sqlWithoutContext,
+              args: paramsWithoutContext
+            });
+          } else {
+            throw columnError;
+          }
+        }
 
         return res.status(200).json({
           success: true,
