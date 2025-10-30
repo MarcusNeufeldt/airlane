@@ -197,10 +197,16 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
     if (hasLanes) {
       // LANE-AWARE POSITIONING (Horizontal flow within lanes, lanes stacked vertically)
       const TASK_SPACING_X = 220;
-      const LANE_HEIGHT = 250;
-      const LANE_START_X = 50;
-      const TASK_START_X = 150;
-      const START_Y = 100;
+      const LANE_HEIGHT = 180; // Height per lane within pool
+      const POOL_START_X = 50;
+      const POOL_START_Y = 100;
+      const POOL_VERTICAL_LABEL_WIDTH = 40; // Width of pool's left vertical label
+      const LANE_HEADER_HEIGHT = 40; // Height of lane header
+      const PADDING_LEFT = 20; // Additional padding from pool edge
+      const PADDING_TOP = 15; // Additional padding from lane header
+
+      // Tasks start position (accounting for pool vertical label + padding)
+      const TASK_START_X = POOL_START_X + POOL_VERTICAL_LABEL_WIDTH + PADDING_LEFT;
 
       // Group tasks by their assigned lane (via assignee property)
       const tasksByLane = new Map<string, ProcessElement[]>();
@@ -231,30 +237,63 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
         unassigned: unassignedTasks.length
       });
 
-      // Position lanes vertically
-      lanes.forEach((lane, laneIndex) => {
-        const laneY = START_Y + (laneIndex * LANE_HEIGHT);
-        const laneName = lane.label || lane.properties?.participant || `Lane ${laneIndex + 1}`;
+      // Check if we have pool-with-lanes or individual lanes
+      const hasPoolWithLanes = lanes.some(l => l.type === 'pool-with-lanes');
 
-        // Position the lane itself
-        positions.set(lane.id, {
-          x: LANE_START_X,
-          y: laneY
-        });
+      if (hasPoolWithLanes) {
+        // POOL-WITH-LANES: Position the pool, tasks positioned inside
+        const pool = lanes.find(l => l.type === 'pool-with-lanes');
+        if (pool) {
+          // Position the pool itself
+          positions.set(pool.id, {
+            x: POOL_START_X,
+            y: POOL_START_Y
+          });
 
-        // Position tasks within this lane horizontally
-        const tasksInLane = tasksByLane.get(laneName) || [];
-        tasksInLane.forEach((task, taskIndex) => {
-          positions.set(task.id, {
-            x: TASK_START_X + (taskIndex * TASK_SPACING_X),
-            y: laneY + 70 // Offset for lane header
+          // Get lanes from pool properties
+          const poolLanes = pool.properties?.lanes || [];
+
+          // Position tasks within each lane
+          poolLanes.forEach((lane: any, laneIndex: number) => {
+            const laneY = POOL_START_Y + (laneIndex * LANE_HEIGHT);
+            const laneName = lane.name || `Lane ${laneIndex + 1}`;
+
+            // Position tasks within this lane horizontally
+            const tasksInLane = tasksByLane.get(laneName) || [];
+            tasksInLane.forEach((task, taskIndex) => {
+              positions.set(task.id, {
+                x: TASK_START_X + (taskIndex * TASK_SPACING_X),
+                y: laneY + LANE_HEADER_HEIGHT + PADDING_TOP
+              });
+            });
+          });
+        }
+      } else {
+        // INDIVIDUAL LANES: Position each lane separately
+        lanes.forEach((lane, laneIndex) => {
+          const laneY = POOL_START_Y + (laneIndex * LANE_HEIGHT);
+          const laneName = lane.label || lane.properties?.participant || `Lane ${laneIndex + 1}`;
+
+          // Position the lane itself (standalone lanes don't have vertical label)
+          positions.set(lane.id, {
+            x: POOL_START_X,
+            y: laneY
+          });
+
+          // Position tasks within this lane horizontally
+          const tasksInLane = tasksByLane.get(laneName) || [];
+          tasksInLane.forEach((task, taskIndex) => {
+            positions.set(task.id, {
+              x: POOL_START_X + PADDING_LEFT + (taskIndex * TASK_SPACING_X),
+              y: laneY + LANE_HEADER_HEIGHT + PADDING_TOP
+            });
           });
         });
-      });
+      }
 
       // Position any unassigned tasks below all lanes
       if (unassignedTasks.length > 0) {
-        const fallbackY = START_Y + (lanes.length * LANE_HEIGHT);
+        const fallbackY = POOL_START_Y + (lanes.length * LANE_HEIGHT);
         unassignedTasks.forEach((task, index) => {
           positions.set(task.id, {
             x: TASK_START_X + (index * TASK_SPACING_X),
