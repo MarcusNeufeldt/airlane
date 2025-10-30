@@ -672,6 +672,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
             ? newNodes.filter(n => (n.type === 'lane' || n.type === 'pool' || n.type === 'pool-with-lanes') && laneIds.includes(n.id))
             : newNodes.filter(n => n.type === 'lane' || n.type === 'pool' || n.type === 'pool-with-lanes');
 
+        console.log('🔧 autoSizeLanes called for', lanesToResize.length, 'lanes');
+
         let updated = false;
 
         lanesToResize.forEach(lane => {
@@ -680,23 +682,34 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
             const laneWidth = lane.data?.width || 600;
             const laneHeight = lane.data?.height || 300;
 
+            console.log(`📏 Checking lane "${lane.data?.label || lane.id}":`, {
+                position: { x: laneX, y: laneY },
+                size: { width: laneWidth, height: laneHeight }
+            });
+
             // Find all nodes that are spatially inside this lane
+            // Use a more forgiving check: node's Y coordinate should be within lane's Y range
             const nodesInLane = newNodes.filter(n => {
                 // Skip the lane itself and other lanes/pools
                 if (n.id === lane.id) return false;
                 if (n.type === 'lane' || n.type === 'pool' || n.type === 'pool-with-lanes') return false;
 
-                // Check if node center is inside the lane bounds
-                const nodeCenterX = n.position.x + ((n.data?.width || n.width || 150) / 2);
-                const nodeCenterY = n.position.y + ((n.data?.height || n.height || 80) / 2);
+                // More forgiving detection: check if node is in the lane's Y-range (horizontal row)
+                const nodeY = n.position.y;
+                const nodeHeight = n.data?.height || n.height || 80;
+                const nodeCenterY = nodeY + (nodeHeight / 2);
 
-                return (
-                    nodeCenterX >= laneX &&
-                    nodeCenterX <= (laneX + laneWidth) &&
-                    nodeCenterY >= laneY &&
-                    nodeCenterY <= (laneY + laneHeight)
-                );
+                // Check if node's vertical center is within the lane's Y range (with some tolerance)
+                const isInLaneRow = nodeCenterY >= (laneY - 50) && nodeCenterY <= (laneY + laneHeight + 50);
+
+                if (isInLaneRow) {
+                    console.log(`  ✅ Found node "${n.data?.label || n.id}" in lane (y: ${nodeY})`);
+                }
+
+                return isInLaneRow;
             });
+
+            console.log(`  📦 Found ${nodesInLane.length} nodes in lane`);
 
             if (nodesInLane.length > 0) {
                 // Calculate bounding box of all nodes inside lane
@@ -712,6 +725,12 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
                 const newWidth = (maxX - minX) + (PADDING * 2);
                 const newHeight = (maxY - minY) + (PADDING * 2) + LANE_HEADER_HEIGHT;
 
+                console.log(`  🎯 Resizing lane to:`, {
+                    width: Math.max(newWidth, 400),
+                    height: Math.max(newHeight, 200),
+                    position: { x: minX - PADDING, y: minY - PADDING - (LANE_HEADER_HEIGHT / 2) }
+                });
+
                 // Update lane position and size
                 lane.position = {
                     x: minX - PADDING,
@@ -724,19 +743,25 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
                 };
 
                 updated = true;
-            } else if (!lane.data?.width || lane.data.width < 400) {
+            } else {
+                console.log(`  ⚠️ No nodes found in lane, keeping default size`);
                 // Set default size for empty lanes
-                lane.data = {
-                    ...lane.data,
-                    width: 600,
-                    height: 250,
-                };
-                updated = true;
+                if (!lane.data?.width || lane.data.width < 400) {
+                    lane.data = {
+                        ...lane.data,
+                        width: 600,
+                        height: 250,
+                    };
+                    updated = true;
+                }
             }
         });
 
         if (updated) {
+            console.log('✅ Lanes updated, applying to diagram');
             setStateWithHistory({ nodes: newNodes }, 'Auto-size Lanes');
+        } else {
+            console.log('⚠️ No lanes updated');
         }
     },
 
